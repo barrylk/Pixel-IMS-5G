@@ -12,6 +12,7 @@ An experimental Shizuku-powered IMS and radio configuration app for Google Tenso
 - Select LTE and NR bands using chips; every currently reported band stays green, including in Automatic mode.
 - Enable per-SIM Easy Mode to apply VoLTE, enhanced LTE/LTE+, automatic bands, LTE+NR allowance, and verified Tensor CA enablement together.
 - Lock advanced radio and band controls while Easy Mode is active, then unlock them without disabling calling settings.
+- Preserve the original Tensor CA state so Undo and Restore All can return the modem to its previous value.
 - Configure and recover each active SIM independently.
 - Explain common IMS registration failures and restore Google/carrier defaults with one tap.
 - Detect loss of service after an app change and undo the exact previous radio state.

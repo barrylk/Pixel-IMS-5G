@@ -209,7 +209,9 @@ class SubscriptionModer(
         private const val LAST_NR_BANDS_PREFIX = "last_nr_bands_"
         private const val LAST_NR_AVAIL_PREFIX = "last_nr_availability_"
         private const val LAST_PROFILE_MODE_PREFIX = "last_radio_profile_mode_"
+        private const val LAST_CA_PREFIX = "last_tensor_ca_"
         private const val EASY_MODE_PREFIX = "easy_mode_"
+        private const val ORIGINAL_CA_PREFIX = "original_tensor_ca_"
         private const val OEM_RIL_SERVICE = "telephony.oem.oemrilhook"
         private const val OEM_RIL_DESCRIPTOR = "com.samsung.slsi.telephony.oem.oemrilhook.IOemRilHook"
         private const val OEM_RIL_GET_RADIO_NODE = 1
@@ -247,6 +249,12 @@ class SubscriptionModer(
             return EasyModeResult(true, getTensorLteCaEnabled())
         }
         saveChangeSnapshot("Enabled VoLTE + LTE CA Easy Mode")
+        if (!prefs.contains(ORIGINAL_CA_PREFIX + subscriptionId)) {
+            prefs.edit().putInt(
+                ORIGINAL_CA_PREFIX + subscriptionId,
+                when (getTensorLteCaEnabled()) { true -> 1; false -> 0; null -> -1 },
+            ).apply()
+        }
         setBandSelectionInternal(intArrayOf(), intArrayOf())
         setRadioMode(1, recordChange = false)
         publishBundle {
@@ -344,6 +352,10 @@ class SubscriptionModer(
                 encode(getIntArrayValue(CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY)),
             )
             .putInt(LAST_PROFILE_MODE_PREFIX + subscriptionId, prefs.getInt(PROFILE_MODE_PREFIX + subscriptionId, 0))
+            .putInt(
+                LAST_CA_PREFIX + subscriptionId,
+                when (getTensorLteCaEnabled()) { true -> 1; false -> 0; null -> -1 },
+            )
             .apply()
     }
 
@@ -381,6 +393,9 @@ class SubscriptionModer(
             PROFILE_MODE_PREFIX + subscriptionId,
             prefs.getInt(LAST_PROFILE_MODE_PREFIX + subscriptionId, 0),
         ).apply()
+        prefs.getInt(LAST_CA_PREFIX + subscriptionId, -1).takeIf { it >= 0 }?.let {
+            setTensorLteCaEnabled(it == 1)
+        }
         clearLastChange(prefs)
         return true
     }
@@ -394,6 +409,7 @@ class SubscriptionModer(
             .remove(LAST_NR_BANDS_PREFIX + subscriptionId)
             .remove(LAST_NR_AVAIL_PREFIX + subscriptionId)
             .remove(LAST_PROFILE_MODE_PREFIX + subscriptionId)
+            .remove(LAST_CA_PREFIX + subscriptionId)
             .apply()
     }
 
@@ -620,9 +636,14 @@ class SubscriptionModer(
             setBandSelectionInternal(intArrayOf(), intArrayOf())
             setRadioMode(0, recordChange = false)
             clearCarrierConfig()
-            context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE).edit()
+            val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+            prefs.getInt(ORIGINAL_CA_PREFIX + subscriptionId, -1).takeIf { it >= 0 }?.let {
+                setTensorLteCaEnabled(it == 1)
+            }
+            prefs.edit()
                 .remove(ORIGINAL_NR_AVAIL_PREFIX + subscriptionId)
                 .remove(EASY_MODE_PREFIX + subscriptionId)
+                .remove(ORIGINAL_CA_PREFIX + subscriptionId)
                 .apply()
             clearLastChange()
             Thread.sleep(500)
