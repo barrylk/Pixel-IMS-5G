@@ -36,7 +36,12 @@ jobs:
           printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
 
       - name: Build signed APK
-        run: ./gradlew :app:assembleDebug
+        run: |
+          ./gradlew :app:assembleDebug \
+            -Pandroid.injected.signing.store.file="$HOME/.android/debug.keystore" \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android
 
       - name: Verify OTA signing identity
         run: |
