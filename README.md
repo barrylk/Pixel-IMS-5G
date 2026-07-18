@@ -1,6 +1,6 @@
 # Pixel IMS 5G
 
-An experimental Shizuku-powered IMS and radio configuration app for Google Tensor Pixel phones, developed and tested on a Pixel 7 Pro running Android 17.
+An experimental Shizuku-powered IMS and radio configuration app for Google Tensor Pixel phones. It uses model-independent Android telephony interfaces for Pixel 6 through Pixel 10 and is developed and tested on a Pixel 7 Pro running Android 17.
 
 ## Features
 
@@ -9,6 +9,11 @@ An experimental Shizuku-powered IMS and radio configuration app for Google Tenso
 - Show live serving radio, LTE/NR bands, NR advertisement and EN-DC eligibility.
 - Actively refresh cell measurements and infer omitted bands from EARFCN/NR-ARFCN.
 - Request LTE/NR band restrictions and detect when Pixel firmware rejects them.
+- Select LTE and NR bands using chips; a selected green chip means that band is currently reported with signal.
+- Configure and recover each active SIM independently.
+- Explain common IMS registration failures and restore Google/carrier defaults with one tap.
+- Detect loss of service after an app change and undo the exact previous radio state.
+- Restore every active SIM, clear the app's recovery state, and reboot from a guarded recovery action.
 - Read the Tensor modem's LTE carrier-aggregation enablement status.
 - Material 3 Expressive interface with dynamic Pixel colors and glass surfaces.
 - Check GitHub Releases and download signed in-app updates.

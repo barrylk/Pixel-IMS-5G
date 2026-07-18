@@ -2,7 +2,7 @@
 
 Pixel IMS 5G is an experimental, Shizuku-powered Android app for Google Tensor Pixels. This build is tested on a Pixel 7 Pro running Android 17.
 
-Version 0.5 introduces a Material 3 Expressive interface with Pixel dynamic colors, edge-to-edge layout, translucent rounded cards, layered tonal light, and a floating glass navigation dock. Light and dark appearances follow the phone automatically.
+Version 0.7 adds per-SIM radio profiles, selectable band chips, IMS failure diagnosis, exact last-change rollback, and a guarded restore-and-reboot recovery action. The app uses model-independent Android telephony interfaces across Tensor Pixel generations; the optional LTE CA readout appears only when the Samsung SLSI service is exposed.
 
 ## Features
 
@@ -21,6 +21,11 @@ Version 0.5 introduces a Material 3 Expressive interface with Pixel dynamic colo
 - Contact the developer and report feedback from the in-app About screen.
 - Check GitHub Releases and download signed APK updates from inside the app.
 - Reset band selection to automatic at any time.
+- Use round Auto, Force NSA, and Force SA choices per SIM.
+- Highlight a selected band in green when the modem currently reports signal on it.
+- Diagnose common IMS failures and restore Google/carrier defaults from a FIX action.
+- Undo the last radio or band change when it removes cellular service.
+- Restore all active SIMs, clear app recovery data, and reboot from the top recovery action.
 
 ## Install and use
 
@@ -32,7 +37,7 @@ Version 0.5 introduces a Material 3 Expressive interface with Pixel dynamic colo
 6. Set **Preferred radio mode** to **NSA/5G preferred (LTE + NR)**.
 7. Restart IMS registration or reboot the phone if IMS does not register immediately.
 
-The **Bands** tab accepts comma-separated LTE and NR band numbers. Selecting several LTE bands requests eligible carrier-aggregation candidates, but cannot force a specific CA combination; that decision remains with the modem and network. Pixel 7 Pro firmware on Android 17 may accept the standard Android request and then discard it. The app detects this and reports that the modem remains on Automatic. Always use **Automatic bands** before travelling or when service disappears.
+The **Bands** tab provides selectable LTE and NR chips. Selecting several LTE bands requests eligible carrier-aggregation candidates, but cannot force a specific CA combination; that decision remains with the modem and network. Pixel firmware may accept the standard Android request and then discard it. The app verifies the retained restriction and reports rejection. Always use **Automatic** before travelling or when service disappears.
 
 The detected-band list contains only cells the modem currently reports; it is not a complete spectrum scan. **Force NSA preference** enables the NSA carrier profile and allows LTE+NR. **Force SA-only** permits only NR and is deliberately disruptive. Neither mode can make a network accept registration or supply EN-DC on a cell where the carrier has disabled it.
 

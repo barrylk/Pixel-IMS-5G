@@ -3,6 +3,8 @@ package dev.bluehouse.enablevolte.pages
 import android.content.pm.PackageManager
 import android.telephony.SubscriptionInfo
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,12 +12,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.navigation.NavController
 import dev.bluehouse.enablevolte.BuildConfig
 import dev.bluehouse.enablevolte.CarrierModer
@@ -25,9 +32,13 @@ import dev.bluehouse.enablevolte.SubscriptionModer
 import dev.bluehouse.enablevolte.checkShizukuPermission
 import dev.bluehouse.enablevolte.components.BooleanPropertyView
 import dev.bluehouse.enablevolte.components.HeaderText
+import dev.bluehouse.enablevolte.components.GlassSurface
 import dev.bluehouse.enablevolte.components.StringPropertyView
 import dev.bluehouse.enablevolte.uniqueName
 import rikka.shizuku.Shizuku
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 const val TAG = "HomeActivity:Home"
 
@@ -44,6 +55,8 @@ fun Home(navController: NavController) {
     var deviceIMSEnabled by rememberSaveable { mutableStateOf(false) }
 
     var isIMSRegistered by rememberSaveable { mutableStateOf(listOf<Boolean>()) }
+    var imsIssues by remember { mutableStateOf(listOf<SubscriptionModer.ImsIssue>()) }
+    val scope = rememberCoroutineScope()
 
     fun loadFlags() {
         shizukuGranted = true
@@ -51,7 +64,9 @@ fun Home(navController: NavController) {
         deviceIMSEnabled = carrierModer.deviceSupportsIMS
 
         if (subscriptions.isNotEmpty() && deviceIMSEnabled) {
-            isIMSRegistered = subscriptions.map { SubscriptionModer(context, it.subscriptionId).isIMSRegistered }
+            val diagnoses = subscriptions.map { SubscriptionModer(context, it.subscriptionId).diagnoseIms() }
+            isIMSRegistered = diagnoses.map { it.registered }
+            imsIssues = diagnoses.map { it.issue }
         }
     }
 
@@ -100,6 +115,30 @@ fun Home(navController: NavController) {
                 trueLabel = stringResource(R.string.registered),
                 falseLabel = stringResource(R.string.unregistered),
             )
+            if (!isRegistered && idx < imsIssues.size) {
+                val reason = when (imsIssues[idx]) {
+                    SubscriptionModer.ImsIssue.NO_CELLULAR_SERVICE -> stringResource(R.string.ims_issue_no_service)
+                    SubscriptionModer.ImsIssue.VOLTE_DISABLED_BY_CONFIG -> stringResource(R.string.ims_issue_volte_disabled)
+                    SubscriptionModer.ImsIssue.LTE_NR_NOT_ALLOWED -> stringResource(R.string.ims_issue_radio_disabled)
+                    SubscriptionModer.ImsIssue.CARRIER_PROVISIONING_OR_NETWORK -> stringResource(R.string.ims_issue_carrier)
+                    SubscriptionModer.ImsIssue.STATUS_UNAVAILABLE -> stringResource(R.string.ims_issue_unknown)
+                    else -> stringResource(R.string.registered)
+                }
+                GlassSurface(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(Dp(16f)), verticalArrangement = Arrangement.spacedBy(Dp(10f))) {
+                        Text(stringResource(R.string.ims_not_available_reason), style = MaterialTheme.typography.titleMedium)
+                        Text(reason)
+                        Button(onClick = {
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    SubscriptionModer(context, subscriptions[idx].subscriptionId).restoreGoogleDefaults()
+                                }
+                                loadFlags()
+                            }
+                        }) { Text(stringResource(R.string.fix_restore_google)) }
+                    }
+                }
+            }
         }
     }
 }

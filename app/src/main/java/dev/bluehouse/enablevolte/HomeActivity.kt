@@ -19,6 +19,9 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -34,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -65,6 +69,9 @@ import dev.bluehouse.enablevolte.ui.theme.EnableVoLTETheme
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
 import java.lang.IllegalStateException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class Screen(
     val route: String,
@@ -102,6 +109,8 @@ fun PixelIMSApp() {
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
 
     var subscriptions by rememberSaveable { mutableStateOf(listOf<SubscriptionInfo>()) }
+    var showRecoveryDialog by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var navBuilder by remember {
         mutableStateOf<NavGraphBuilder.() -> Unit>({
             composable("home", context.resources.getString(R.string.home)) {
@@ -178,6 +187,24 @@ fun PixelIMSApp() {
             loadApplication()
         }
     }
+    if (showRecoveryDialog) {
+        AlertDialog(
+            onDismissRequest = { showRecoveryDialog = false },
+            title = { Text(stringResource(R.string.restore_reboot_title)) },
+            text = { Text(stringResource(R.string.restore_reboot_message)) },
+            confirmButton = {
+                Button(onClick = {
+                    showRecoveryDialog = false
+                    scope.launch {
+                        withContext(Dispatchers.IO) { carrierModer.restoreAllManagedSettingsAndReboot() }
+                    }
+                }) { Text(stringResource(R.string.restore_and_reboot)) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRecoveryDialog = false }) { Text(stringResource(R.string.dismiss)) }
+            },
+        )
+    }
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
@@ -202,6 +229,14 @@ fun PixelIMSApp() {
                     }
                 },
                 actions = {
+                    if (subscriptions.isNotEmpty()) {
+                        IconButton(
+                            onClick = { showRecoveryDialog = true },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(),
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.restore_and_reboot))
+                        }
+                    }
                     if (currentBackStackEntry?.destination?.route != "home/about") {
                         IconButton(
                             onClick = { navController.navigate("home/about") },

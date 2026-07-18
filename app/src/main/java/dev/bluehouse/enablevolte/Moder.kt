@@ -12,6 +12,7 @@ import android.os.IInterface
 import android.os.IBinder
 import android.os.Parcel
 import android.os.PersistableBundle
+import android.os.IPowerManager
 import android.os.ServiceManager
 import android.telephony.CarrierConfigManager
 import android.telephony.AccessNetworkConstants
@@ -24,6 +25,7 @@ import android.telephony.CellInfo
 import android.telephony.ICellInfoCallback
 import android.telephony.NetworkRegistrationInfo
 import android.telephony.RadioAccessSpecifier
+import android.telephony.ServiceState
 import android.telephony.SubscriptionInfo
 import android.telephony.TelephonyManager
 import android.telephony.TelephonyFrameworkInitializer
@@ -175,6 +177,16 @@ class CarrierModer(
             val volteConfigId = res.getIdentifier("config_device_volte_available", "bool", "android")
             return res.getBoolean(volteConfigId)
         }
+
+    fun restoreAllManagedSettingsAndReboot() {
+        subscriptions.forEach { SubscriptionModer(context, it.subscriptionId).restoreGoogleDefaults() }
+        context.getSharedPreferences("pixel_ims_5g_network_modes", Context.MODE_PRIVATE).edit().clear().commit()
+        context.getSharedPreferences("github_updater", Context.MODE_PRIVATE).edit().clear().apply()
+        val power = IPowerManager.Stub.asInterface(
+            ShizukuBinderWrapper(ServiceManager.getService(Context.POWER_SERVICE)),
+        )
+        power.reboot(false, "Pixel IMS 5G restore", false)
+    }
 }
 
 class SubscriptionModer(
@@ -188,31 +200,48 @@ class SubscriptionModer(
         private const val NETWORK_PREFS = "pixel_ims_5g_network_modes"
         private const val ORIGINAL_MASK_PREFIX = "original_user_mask_"
         private const val ORIGINAL_CARRIER_MASK_PREFIX = "original_carrier_mask_"
+        private const val ORIGINAL_NR_AVAIL_PREFIX = "original_nr_availability_"
+        private const val PROFILE_MODE_PREFIX = "radio_profile_mode_"
+        private const val LAST_ACTION_PREFIX = "last_action_"
+        private const val LAST_USER_MASK_PREFIX = "last_user_mask_"
+        private const val LAST_CARRIER_MASK_PREFIX = "last_carrier_mask_"
+        private const val LAST_LTE_BANDS_PREFIX = "last_lte_bands_"
+        private const val LAST_NR_BANDS_PREFIX = "last_nr_bands_"
+        private const val LAST_NR_AVAIL_PREFIX = "last_nr_availability_"
+        private const val LAST_PROFILE_MODE_PREFIX = "last_radio_profile_mode_"
         private const val OEM_RIL_SERVICE = "telephony.oem.oemrilhook"
         private const val OEM_RIL_DESCRIPTOR = "com.samsung.slsi.telephony.oem.oemrilhook.IOemRilHook"
         private const val OEM_RIL_GET_RADIO_NODE = 1
         private const val TENSOR_LTE_CA_ENABLEMENT_NODE = 12300
     }
 
+    enum class ImsIssue {
+        REGISTERED,
+        NO_CELLULAR_SERVICE,
+        VOLTE_DISABLED_BY_CONFIG,
+        LTE_NR_NOT_ALLOWED,
+        CARRIER_PROVISIONING_OR_NETWORK,
+        STATUS_UNAVAILABLE,
+    }
+
+    data class ImsDiagnosis(
+        val registered: Boolean,
+        val issue: ImsIssue,
+    )
+
     val radioModeIndex: Int
         get() {
-            val mask = this.loadCachedInterface { telephony }.getAllowedNetworkTypesForReason(
-                subscriptionId,
-                TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER,
-            )
-            return when {
-                mask == TelephonyManager.NETWORK_TYPE_BITMASK_NR -> 2
-                mask and TelephonyManager.NETWORK_TYPE_BITMASK_NR != 0L -> 1
-                else -> 0
-            }
+            return context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+                .getInt(PROFILE_MODE_PREFIX + subscriptionId, 0)
         }
 
-    fun setRadioMode(index: Int): Boolean {
+    fun setRadioMode(index: Int, recordChange: Boolean = true): Boolean {
         val phone = this.loadCachedInterface { telephony }
         val userReason = TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER
         val carrierReason = TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER
         val currentUser = phone.getAllowedNetworkTypesForReason(subscriptionId, userReason)
         val currentCarrier = phone.getAllowedNetworkTypesForReason(subscriptionId, carrierReason)
+        if (recordChange) saveChangeSnapshot("Radio profile changed")
         val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
         val originalKey = ORIGINAL_MASK_PREFIX + subscriptionId
         val originalCarrierKey = ORIGINAL_CARRIER_MASK_PREFIX + subscriptionId
@@ -241,10 +270,96 @@ class SubscriptionModer(
 
         val carrierChanged = setAllowedNetworkTypesForReason(phone, carrierReason, requestedCarrier)
         val userChanged = setAllowedNetworkTypesForReason(phone, userReason, requestedUser)
+        if (carrierChanged && userChanged) {
+            prefs.edit().putInt(PROFILE_MODE_PREFIX + subscriptionId, index).apply()
+        }
         if (carrierChanged && userChanged && index == 0) {
             prefs.edit().remove(originalKey).remove(originalCarrierKey).apply()
         }
         return carrierChanged && userChanged
+    }
+
+    private fun encode(values: IntArray): String = values.joinToString(",")
+
+    private fun decode(value: String?): IntArray = value.orEmpty()
+        .split(',')
+        .mapNotNull { it.trim().toIntOrNull() }
+        .distinct()
+        .sorted()
+        .toIntArray()
+
+    private fun saveChangeSnapshot(action: String) {
+        val phone = this.loadCachedInterface { telephony }
+        val bands = try { getBandSelection() } catch (_: Exception) { BandSelection(intArrayOf(), intArrayOf()) }
+        val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(LAST_ACTION_PREFIX + subscriptionId, action)
+            .putLong(
+                LAST_USER_MASK_PREFIX + subscriptionId,
+                phone.getAllowedNetworkTypesForReason(subscriptionId, TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER),
+            )
+            .putLong(
+                LAST_CARRIER_MASK_PREFIX + subscriptionId,
+                phone.getAllowedNetworkTypesForReason(subscriptionId, TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER),
+            )
+            .putString(LAST_LTE_BANDS_PREFIX + subscriptionId, encode(bands.lteBands))
+            .putString(LAST_NR_BANDS_PREFIX + subscriptionId, encode(bands.nrBands))
+            .putString(
+                LAST_NR_AVAIL_PREFIX + subscriptionId,
+                encode(getIntArrayValue(CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY)),
+            )
+            .putInt(LAST_PROFILE_MODE_PREFIX + subscriptionId, prefs.getInt(PROFILE_MODE_PREFIX + subscriptionId, 0))
+            .apply()
+    }
+
+    val lastChangeDescription: String?
+        get() = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+            .getString(LAST_ACTION_PREFIX + subscriptionId, null)
+
+    fun hasCellularService(): Boolean {
+        return try {
+            val state = this.loadCachedInterface { telephony }
+                .getServiceStateForSlot(simSlotIndex, false, false, "com.android.shell", null)
+            state?.state == ServiceState.STATE_IN_SERVICE
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun undoLastChange(): Boolean {
+        val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(LAST_ACTION_PREFIX + subscriptionId)) return false
+        val phone = this.loadCachedInterface { telephony }
+        val user = prefs.getLong(LAST_USER_MASK_PREFIX + subscriptionId, -1L)
+        val carrier = prefs.getLong(LAST_CARRIER_MASK_PREFIX + subscriptionId, -1L)
+        if (user >= 0) setAllowedNetworkTypesForReason(phone, TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER, user)
+        if (carrier >= 0) setAllowedNetworkTypesForReason(phone, TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER, carrier)
+        updateCarrierConfig(
+            CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
+            decode(prefs.getString(LAST_NR_AVAIL_PREFIX + subscriptionId, "")),
+        )
+        setBandSelectionInternal(
+            decode(prefs.getString(LAST_LTE_BANDS_PREFIX + subscriptionId, "")),
+            decode(prefs.getString(LAST_NR_BANDS_PREFIX + subscriptionId, "")),
+        )
+        prefs.edit().putInt(
+            PROFILE_MODE_PREFIX + subscriptionId,
+            prefs.getInt(LAST_PROFILE_MODE_PREFIX + subscriptionId, 0),
+        ).apply()
+        clearLastChange(prefs)
+        return true
+    }
+
+    private fun clearLastChange(prefs: android.content.SharedPreferences = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)) {
+        prefs.edit()
+            .remove(LAST_ACTION_PREFIX + subscriptionId)
+            .remove(LAST_USER_MASK_PREFIX + subscriptionId)
+            .remove(LAST_CARRIER_MASK_PREFIX + subscriptionId)
+            .remove(LAST_LTE_BANDS_PREFIX + subscriptionId)
+            .remove(LAST_NR_BANDS_PREFIX + subscriptionId)
+            .remove(LAST_NR_AVAIL_PREFIX + subscriptionId)
+            .remove(LAST_PROFILE_MODE_PREFIX + subscriptionId)
+            .apply()
     }
 
     private fun setAllowedNetworkTypesForReason(
@@ -349,19 +464,48 @@ class SubscriptionModer(
     }
 
     fun requestNsaOnly(): Boolean {
+        saveChangeSnapshot("Forced NSA (LTE + NR)")
+        rememberOriginalNrAvailability()
         updateCarrierConfig(
             CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
             intArrayOf(CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA),
         )
-        return setRadioMode(1)
+        return setRadioMode(1, recordChange = false)
     }
 
     fun requestSaOnly(): Boolean {
+        saveChangeSnapshot("Forced SA (NR only)")
+        rememberOriginalNrAvailability()
         updateCarrierConfig(
             CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
             intArrayOf(CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA),
         )
-        return setRadioMode(2)
+        return setRadioMode(2, recordChange = false)
+    }
+
+    fun requestAutomaticRadio(): Boolean {
+        saveChangeSnapshot("Restored automatic radio selection")
+        val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+        val key = ORIGINAL_NR_AVAIL_PREFIX + subscriptionId
+        if (prefs.contains(key)) {
+            updateCarrierConfig(
+                CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
+                decode(prefs.getString(key, "")),
+            )
+            prefs.edit().remove(key).apply()
+        }
+        return setRadioMode(0, recordChange = false)
+    }
+
+    private fun rememberOriginalNrAvailability() {
+        val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+        val key = ORIGINAL_NR_AVAIL_PREFIX + subscriptionId
+        if (!prefs.contains(key)) {
+            prefs.edit().putString(
+                key,
+                encode(getIntArrayValue(CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY)),
+            ).apply()
+        }
     }
 
     fun getBandSelection(): BandSelection {
@@ -376,6 +520,17 @@ class SubscriptionModer(
     }
 
     fun setBandSelection(
+        lteBands: IntArray,
+        nrBands: IntArray,
+    ): Boolean {
+        saveChangeSnapshot(
+            if (lteBands.isEmpty() && nrBands.isEmpty()) "Restored automatic band selection"
+            else "Restricted LTE/NR bands",
+        )
+        return setBandSelectionInternal(lteBands, nrBands)
+    }
+
+    private fun setBandSelectionInternal(
         lteBands: IntArray,
         nrBands: IntArray,
     ): Boolean {
@@ -403,6 +558,44 @@ class SubscriptionModer(
         val applied = getBandSelection()
         return applied.lteBands.contentEquals(lteBands.distinct().sorted().toIntArray()) &&
             applied.nrBands.contentEquals(nrBands.distinct().sorted().toIntArray())
+    }
+
+    fun diagnoseIms(): ImsDiagnosis {
+        return try {
+            if (isIMSRegistered) return ImsDiagnosis(true, ImsIssue.REGISTERED)
+            if (!hasCellularService()) return ImsDiagnosis(false, ImsIssue.NO_CELLULAR_SERVICE)
+            if (!isVoLteConfigEnabled) return ImsDiagnosis(false, ImsIssue.VOLTE_DISABLED_BY_CONFIG)
+            val mask = this.loadCachedInterface { telephony }.getAllowedNetworkTypesForReason(
+                subscriptionId,
+                TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER,
+            )
+            if (mask and (TelephonyManager.NETWORK_TYPE_BITMASK_LTE or TelephonyManager.NETWORK_TYPE_BITMASK_NR) == 0L) {
+                ImsDiagnosis(false, ImsIssue.LTE_NR_NOT_ALLOWED)
+            } else {
+                ImsDiagnosis(false, ImsIssue.CARRIER_PROVISIONING_OR_NETWORK)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to diagnose IMS", e)
+            ImsDiagnosis(false, ImsIssue.STATUS_UNAVAILABLE)
+        }
+    }
+
+    fun restoreGoogleDefaults(): Boolean {
+        return try {
+            setBandSelectionInternal(intArrayOf(), intArrayOf())
+            setRadioMode(0, recordChange = false)
+            clearCarrierConfig()
+            context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE).edit()
+                .remove(ORIGINAL_NR_AVAIL_PREFIX + subscriptionId)
+                .apply()
+            clearLastChange()
+            Thread.sleep(500)
+            restartIMSRegistration()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Unable to restore Google defaults", e)
+            false
+        }
     }
 
     /** Returns null on devices without Samsung SLSI's OEM radio service. */

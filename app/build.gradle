@@ -10,10 +10,11 @@ android {
 
     defaultConfig {
         applicationId "com.fibc.pixel5gims"
-        minSdk 28
+        // Every Tensor Pixel (Pixel 6 and newer) launched on Android 12 / API 31 or later.
+        minSdk 31
         targetSdk 36
-        versionCode 7
-        versionName "0.6.0"
+        versionCode 8
+        versionName "0.7.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
