@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">Pixel IMS</string>
+  <string name="app_name">Pixel IMS 5G</string>
   <string name="title_activity_home">HomeActivity</string>
   <string name="home">ホーム</string>
   <string name="config">設定</string>

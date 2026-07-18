@@ -9,10 +9,23 @@ import android.os.Build
 import android.os.Build.VERSION_CODES
 import android.os.Bundle
 import android.os.IInterface
+import android.os.IBinder
+import android.os.Parcel
 import android.os.PersistableBundle
 import android.os.ServiceManager
 import android.telephony.CarrierConfigManager
+import android.telephony.AccessNetworkConstants
+import android.telephony.AccessNetworkUtils
+import android.telephony.CellIdentityLte
+import android.telephony.CellIdentityNr
+import android.telephony.CellInfoLte
+import android.telephony.CellInfoNr
+import android.telephony.CellInfo
+import android.telephony.ICellInfoCallback
+import android.telephony.NetworkRegistrationInfo
+import android.telephony.RadioAccessSpecifier
 import android.telephony.SubscriptionInfo
+import android.telephony.TelephonyManager
 import android.telephony.TelephonyFrameworkInitializer
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -25,6 +38,8 @@ import rikka.shizuku.SystemServiceHelper
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 object InterfaceCache {
     val cache = HashMap<String, IInterface>()
@@ -168,6 +183,253 @@ class SubscriptionModer(
 ) : Moder() {
     @Suppress("ktlint:standard:property-naming")
     private val TAG = "CarrierModer"
+
+    companion object {
+        private const val NETWORK_PREFS = "pixel_ims_5g_network_modes"
+        private const val ORIGINAL_MASK_PREFIX = "original_user_mask_"
+        private const val ORIGINAL_CARRIER_MASK_PREFIX = "original_carrier_mask_"
+        private const val OEM_RIL_SERVICE = "telephony.oem.oemrilhook"
+        private const val OEM_RIL_DESCRIPTOR = "com.samsung.slsi.telephony.oem.oemrilhook.IOemRilHook"
+        private const val OEM_RIL_GET_RADIO_NODE = 1
+        private const val TENSOR_LTE_CA_ENABLEMENT_NODE = 12300
+    }
+
+    val radioModeIndex: Int
+        get() {
+            val mask = this.loadCachedInterface { telephony }.getAllowedNetworkTypesForReason(
+                subscriptionId,
+                TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER,
+            )
+            return when {
+                mask == TelephonyManager.NETWORK_TYPE_BITMASK_NR -> 2
+                mask and TelephonyManager.NETWORK_TYPE_BITMASK_NR != 0L -> 1
+                else -> 0
+            }
+        }
+
+    fun setRadioMode(index: Int): Boolean {
+        val phone = this.loadCachedInterface { telephony }
+        val userReason = TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER
+        val carrierReason = TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER
+        val currentUser = phone.getAllowedNetworkTypesForReason(subscriptionId, userReason)
+        val currentCarrier = phone.getAllowedNetworkTypesForReason(subscriptionId, carrierReason)
+        val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+        val originalKey = ORIGINAL_MASK_PREFIX + subscriptionId
+        val originalCarrierKey = ORIGINAL_CARRIER_MASK_PREFIX + subscriptionId
+
+        if (index != 0 && !prefs.contains(originalKey)) {
+            prefs.edit()
+                .putLong(originalKey, currentUser)
+                .putLong(originalCarrierKey, currentCarrier)
+                .apply()
+        }
+
+        val requestedUser = when (index) {
+            0 -> prefs.getLong(originalKey, currentUser)
+            1 -> currentUser or
+                TelephonyManager.NETWORK_TYPE_BITMASK_NR or
+                TelephonyManager.NETWORK_TYPE_BITMASK_LTE
+            2 -> TelephonyManager.NETWORK_TYPE_BITMASK_NR
+            else -> throw IllegalArgumentException("Unknown radio mode index: $index")
+        }
+        val requestedCarrier = when (index) {
+            0 -> prefs.getLong(originalCarrierKey, currentCarrier)
+            else -> currentCarrier or
+                TelephonyManager.NETWORK_TYPE_BITMASK_NR or
+                TelephonyManager.NETWORK_TYPE_BITMASK_LTE
+        }
+
+        val carrierChanged = setAllowedNetworkTypesForReason(phone, carrierReason, requestedCarrier)
+        val userChanged = setAllowedNetworkTypesForReason(phone, userReason, requestedUser)
+        if (carrierChanged && userChanged && index == 0) {
+            prefs.edit().remove(originalKey).remove(originalCarrierKey).apply()
+        }
+        return carrierChanged && userChanged
+    }
+
+    private fun setAllowedNetworkTypesForReason(
+        phone: ITelephony,
+        reason: Int,
+        networkTypes: Long,
+    ): Boolean {
+        return try {
+            phone.setAllowedNetworkTypesForReason(subscriptionId, reason, networkTypes)
+        } catch (e: NoSuchMethodError) {
+            // Android 17 adds the calling package to this hidden Binder method.
+            val method = phone.javaClass.getMethod(
+                "setAllowedNetworkTypesForReason",
+                Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType,
+                String::class.java,
+            )
+            method.invoke(phone, subscriptionId, reason, networkTypes, "com.android.shell") as Boolean
+        }
+    }
+
+    data class BandSelection(
+        val lteBands: IntArray,
+        val nrBands: IntArray,
+    )
+
+    data class RadioDiagnostics(
+        val lteBands: IntArray,
+        val nrBands: IntArray,
+        val servingLteBands: IntArray,
+        val servingNrBands: IntArray,
+        val dataRat: String,
+        val nrAvailable: Boolean?,
+        val endcAvailable: Boolean?,
+    )
+
+    fun getRadioDiagnostics(): RadioDiagnostics {
+        val phone = this.loadCachedInterface { telephony }
+        var refreshedCells: List<CellInfo>? = null
+        val refreshLatch = CountDownLatch(1)
+        val callback = object : ICellInfoCallback.Stub() {
+            override fun onCellInfo(cellInfo: MutableList<CellInfo>?) {
+                refreshedCells = cellInfo?.toList()
+                refreshLatch.countDown()
+            }
+
+            override fun onError(errorCode: Int, exceptionName: String?, message: String?) {
+                Log.w(TAG, "Cell scan refresh failed: $errorCode $exceptionName $message")
+                refreshLatch.countDown()
+            }
+        }
+        val cells = try {
+            phone.requestCellInfoUpdate(subscriptionId, callback, "com.android.shell", null)
+            refreshLatch.await(4, TimeUnit.SECONDS)
+            refreshedCells ?: phone.getAllCellInfo("com.android.shell", null) ?: emptyList()
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to read visible cells", e)
+            try {
+                phone.getAllCellInfo("com.android.shell", null) ?: emptyList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+        val lteCells = cells.filterIsInstance<CellInfoLte>()
+        val nrCells = cells.filterIsInstance<CellInfoNr>()
+        val state = try {
+            phone.getServiceStateForSlot(simSlotIndex, false, false, "com.android.shell", null)
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to read service state", e)
+            null
+        }
+        val registration = state?.getNetworkRegistrationInfo(
+            NetworkRegistrationInfo.DOMAIN_PS,
+            AccessNetworkConstants.TRANSPORT_TYPE_WWAN,
+        )
+        val dataInfo = registration?.dataSpecificInfo
+        val servingIdentity = registration?.cellIdentity
+        return RadioDiagnostics(
+            lteBands = lteCells.flatMap {
+                val identity = it.cellIdentity
+                identity.bands.toList().ifEmpty {
+                    AccessNetworkUtils.getOperatingBandForEarfcn(identity.earfcn)
+                        .takeIf { band -> band != AccessNetworkUtils.INVALID_BAND }
+                        ?.let(::listOf) ?: emptyList()
+                }
+            }.distinct().sorted().toIntArray(),
+            nrBands = nrCells.flatMap {
+                val identity = it.cellIdentity as CellIdentityNr
+                identity.bands.toList().ifEmpty {
+                    AccessNetworkUtils.getOperatingBandForNrarfcn(identity.nrarfcn)
+                        .takeIf { band -> band != AccessNetworkUtils.INVALID_BAND }
+                        ?.let(::listOf) ?: emptyList()
+                }
+            }.distinct().sorted().toIntArray(),
+            servingLteBands = (servingIdentity as? CellIdentityLte)?.bands?.sortedArray() ?: intArrayOf(),
+            servingNrBands = (servingIdentity as? CellIdentityNr)?.bands?.sortedArray() ?: intArrayOf(),
+            dataRat = registration?.accessNetworkTechnology?.let(TelephonyManager::getNetworkTypeName) ?: "Unknown",
+            nrAvailable = dataInfo?.isNrAvailable,
+            endcAvailable = dataInfo?.isEnDcAvailable,
+        )
+    }
+
+    fun requestNsaOnly(): Boolean {
+        updateCarrierConfig(
+            CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
+            intArrayOf(CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA),
+        )
+        return setRadioMode(1)
+    }
+
+    fun requestSaOnly(): Boolean {
+        updateCarrierConfig(
+            CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
+            intArrayOf(CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA),
+        )
+        return setRadioMode(2)
+    }
+
+    fun getBandSelection(): BandSelection {
+        val specifiers = this.loadCachedInterface { telephony }.getSystemSelectionChannels(subscriptionId)
+        val lte = specifiers.firstOrNull {
+            it.radioAccessNetwork == AccessNetworkConstants.AccessNetworkType.EUTRAN
+        }?.bands ?: intArrayOf()
+        val nr = specifiers.firstOrNull {
+            it.radioAccessNetwork == AccessNetworkConstants.AccessNetworkType.NGRAN
+        }?.bands ?: intArrayOf()
+        return BandSelection(lte.sortedArray(), nr.sortedArray())
+    }
+
+    fun setBandSelection(
+        lteBands: IntArray,
+        nrBands: IntArray,
+    ): Boolean {
+        val specifiers = mutableListOf<RadioAccessSpecifier>()
+        if (lteBands.isNotEmpty()) {
+            specifiers.add(
+                RadioAccessSpecifier(
+                    AccessNetworkConstants.AccessNetworkType.EUTRAN,
+                    lteBands.distinct().sorted().toIntArray(),
+                    intArrayOf(),
+                ),
+            )
+        }
+        if (nrBands.isNotEmpty()) {
+            specifiers.add(
+                RadioAccessSpecifier(
+                    AccessNetworkConstants.AccessNetworkType.NGRAN,
+                    nrBands.distinct().sorted().toIntArray(),
+                    intArrayOf(),
+                ),
+            )
+        }
+        this.loadCachedInterface { telephony }.setSystemSelectionChannels(specifiers, subscriptionId, null)
+        Thread.sleep(750)
+        val applied = getBandSelection()
+        return applied.lteBands.contentEquals(lteBands.distinct().sorted().toIntArray()) &&
+            applied.nrBands.contentEquals(nrBands.distinct().sorted().toIntArray())
+    }
+
+    /** Returns null on devices without Samsung SLSI's OEM radio service. */
+    fun getTensorLteCaEnabled(): Boolean? {
+        val service = SystemServiceHelper.getSystemService(OEM_RIL_SERVICE) ?: return null
+        val binder: IBinder = ShizukuBinderWrapper(service)
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(OEM_RIL_DESCRIPTOR)
+            data.writeInt(TENSOR_LTE_CA_ENABLEMENT_NODE)
+            data.writeInt(simSlotIndex)
+            if (!binder.transact(OEM_RIL_GET_RADIO_NODE, data, reply, 0)) return null
+            reply.readException()
+            when (reply.readString()?.trim()) {
+                "1" -> true
+                "0" -> false
+                else -> null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to read Tensor LTE CA status", e)
+            null
+        } finally {
+            reply.recycle()
+            data.recycle()
+        }
+    }
 
     private fun overrideConfigDirectly(bundle: Bundle?) {
         val iCclInstance = this.loadCachedInterface { carrierConfigLoader }
@@ -520,6 +782,19 @@ class SubscriptionModer(
             } else {
                 false
             }
+
+    val nrAvailabilityIndex: Int
+        get() {
+            val values = this.getIntArrayValue(CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY)
+            val nsa = values.contains(CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA)
+            val sa = values.contains(CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA)
+            return when {
+                nsa && sa -> 3
+                nsa -> 1
+                sa -> 2
+                else -> 0
+            }
+        }
 
     val userAgentConfig: String
         get() = this.getStringValue(KEY_IMS_USER_AGENT) ?: ""

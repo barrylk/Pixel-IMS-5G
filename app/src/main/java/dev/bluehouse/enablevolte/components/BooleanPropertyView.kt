@@ -3,6 +3,7 @@ package dev.bluehouse.enablevolte.components
 import android.os.Build
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -33,30 +34,30 @@ fun BooleanPropertyView(
     val localEnabled = enabled && Build.VERSION.SDK_INT >= minSdk
 
     if (toggled == null) {
-        Column(modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)) {
-            Text(text = label, fontSize = 18.sp, modifier = Modifier.padding(bottom = 4.dp))
-            Text(text = stringResource(R.string.unknown), fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
+        GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Text(text = label, style = MaterialTheme.typography.titleMedium)
+                Text(text = stringResource(R.string.unknown), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         return
     }
     if (onClick != null) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)) {
-            Text(text = label, modifier = Modifier.weight(1F), fontSize = 18.sp)
-            Switch(checked = toggled, enabled = localEnabled, onCheckedChange = onClick)
+        GlassSurface(modifier = Modifier.fillMaxWidth(), onClick = { if (localEnabled) onClick(!toggled) }) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+                Column(modifier = Modifier.weight(1F)) {
+                    Text(text = label, style = MaterialTheme.typography.titleMedium)
+                    Text(text = if (toggled) trueLabel else falseLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = toggled, enabled = localEnabled, onCheckedChange = onClick)
+            }
         }
     } else {
-        Column(modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)) {
-            Text(text = label, fontSize = 18.sp, modifier = Modifier.padding(bottom = 4.dp))
-            Text(
-                text =
-                    if (toggled) {
-                        trueLabel
-                    } else {
-                        falseLabel
-                    },
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.outline,
-            )
+        GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Text(text = label, style = MaterialTheme.typography.titleMedium)
+                Text(text = if (toggled) trueLabel else falseLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

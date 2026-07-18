@@ -6,12 +6,16 @@ import android.telephony.SubscriptionInfo
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,10 +37,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -47,10 +54,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import dev.bluehouse.enablevolte.components.OnLifecycleEvent
+import dev.bluehouse.enablevolte.components.GlassBackdrop
 import dev.bluehouse.enablevolte.pages.Config
+import dev.bluehouse.enablevolte.pages.Bands
 import dev.bluehouse.enablevolte.pages.DumpedConfig
 import dev.bluehouse.enablevolte.pages.Editor
 import dev.bluehouse.enablevolte.pages.Home
+import dev.bluehouse.enablevolte.pages.About
 import dev.bluehouse.enablevolte.ui.theme.EnableVoLTETheme
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
@@ -70,13 +80,11 @@ class HomeActivity : ComponentActivity() {
 
         HiddenApiBypass.addHiddenApiExemptions("L")
         HiddenApiBypass.addHiddenApiExemptions("I")
+        enableEdgeToEdge()
 
         setContent {
             EnableVoLTETheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                ) {
+                GlassBackdrop {
                     PixelIMSApp()
                 }
             }
@@ -99,6 +107,9 @@ fun PixelIMSApp() {
             composable("home", context.resources.getString(R.string.home)) {
                 Home(navController)
             }
+            composable("home/about", context.resources.getString(R.string.about)) {
+                About()
+            }
         })
     }
 
@@ -114,6 +125,9 @@ fun PixelIMSApp() {
             composable("home", context.resources.getString(R.string.home)) {
                 Home(navController)
             }
+            composable("home/about", context.resources.getString(R.string.about)) {
+                About()
+            }
             for (subscription in subscriptions) {
                 navigation(startDestination = "config${subscription.subscriptionId}", route = "config${subscription.subscriptionId}root") {
                     composable("config${subscription.subscriptionId}", context.resources.getString(R.string.sim_config)) {
@@ -125,6 +139,9 @@ fun PixelIMSApp() {
                     composable("config${subscription.subscriptionId}/edit", context.resources.getString(R.string.expert_mode)) {
                         Editor(subscription.subscriptionId)
                     }
+                }
+                composable("bands${subscription.subscriptionId}", context.resources.getString(R.string.bands)) {
+                    Bands(subscription.subscriptionId)
                 }
             }
         }
@@ -162,19 +179,21 @@ fun PixelIMSApp() {
         }
     }
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         currentBackStackEntry?.destination?.label?.toString() ?: stringResource(R.string.app_name),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 },
                 navigationIcon = {
                     if (currentBackStackEntry?.destination?.depth?.let { it > 1 } == true) {
                         IconButton(onClick = {
                             navController.popBackStack()
-                        }, colors = IconButtonDefaults.filledIconButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                        }, colors = IconButtonDefaults.filledTonalIconButtonColors()) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Go back",
@@ -183,10 +202,18 @@ fun PixelIMSApp() {
                     }
                 },
                 actions = {
+                    if (currentBackStackEntry?.destination?.route != "home/about") {
+                        IconButton(
+                            onClick = { navController.navigate("home/about") },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(),
+                        ) {
+                            Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.about))
+                        }
+                    }
                     if (currentBackStackEntry?.destination?.route == "home") {
                         IconButton(onClick = {
                             loadApplication()
-                        }, colors = IconButtonDefaults.filledIconButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                        }, colors = IconButtonDefaults.filledTonalIconButtonColors()) {
                             Icon(
                                 imageVector = Icons.Filled.Refresh,
                                 contentDescription = "Refresh contents",
@@ -194,12 +221,19 @@ fun PixelIMSApp() {
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary),
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f),
+                ),
             )
         },
         bottomBar = {
             if (currentBackStackEntry?.destination?.depth?.let { it == 1 } == true) {
-                NavigationBar {
+                NavigationBar(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).clip(RoundedCornerShape(32.dp)),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.84f),
+                    tonalElevation = 8.dp,
+                ) {
                     val currentDestination = currentBackStackEntry?.destination
                     val items =
                         arrayListOf(
@@ -208,6 +242,13 @@ fun PixelIMSApp() {
                     for (subscription in subscriptions) {
                         items.add(
                             Screen("config${subscription.subscriptionId}", subscription.uniqueName, Icons.Filled.Settings),
+                        )
+                        items.add(
+                            Screen(
+                                "bands${subscription.subscriptionId}",
+                                "${subscription.uniqueName} ${stringResource(R.string.bands)}",
+                                Icons.AutoMirrored.Filled.List,
+                            ),
                         )
                     }
 
@@ -248,10 +289,7 @@ fun PixelIMSApp() {
 @Composable
 fun PixelIMSAppPreview() {
     EnableVoLTETheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-        ) {
+        GlassBackdrop {
             PixelIMSApp()
         }
     }

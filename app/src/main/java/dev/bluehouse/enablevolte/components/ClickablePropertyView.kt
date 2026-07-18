@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,23 +29,27 @@ fun ClickablePropertyView(
     onClick: (() -> Unit)? = null,
 ) {
     if (value == null) {
-        Column(modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)) {
-            Text(text = label, fontSize = labelFontSize, modifier = Modifier.padding(bottom = 4.dp))
-            Text(text = stringResource(R.string.unknown), color = MaterialTheme.colorScheme.outline, fontSize = valueFontSize)
+        GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Text(text = label, style = MaterialTheme.typography.titleMedium)
+                Text(text = stringResource(R.string.unknown), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            }
         }
         return
     }
     if (onClick != null) {
-        Surface(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)) {
-                Text(text = label, modifier = Modifier.padding(bottom = 4.dp), fontSize = labelFontSize, fontFamily = labelFontFamily)
-                Text(text = value, color = MaterialTheme.colorScheme.outline, fontSize = valueFontSize, fontFamily = valueFontFamily)
+        GlassSurface(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Text(text = label, modifier = Modifier.padding(bottom = 4.dp), style = MaterialTheme.typography.titleMedium, fontFamily = labelFontFamily)
+                Text(text = value, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, fontFamily = valueFontFamily)
             }
         }
     } else {
-        Column(modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)) {
-            Text(text = label, modifier = Modifier.padding(bottom = 4.dp), fontSize = labelFontSize, fontFamily = labelFontFamily)
-            Text(text = value, color = MaterialTheme.colorScheme.outline, fontSize = valueFontSize, fontFamily = valueFontFamily)
+        GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Text(text = label, modifier = Modifier.padding(bottom = 4.dp), style = MaterialTheme.typography.titleMedium, fontFamily = labelFontFamily)
+                Text(text = value, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, fontFamily = valueFontFamily)
+            }
         }
     }
 }

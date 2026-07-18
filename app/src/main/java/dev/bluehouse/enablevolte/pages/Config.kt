@@ -57,6 +57,8 @@ fun Config(
     var configurable by rememberSaveable { mutableStateOf(false) }
     var voLTEEnabled by rememberSaveable { mutableStateOf(false) }
     var voNREnabled by rememberSaveable { mutableStateOf(false) }
+    var nrAvailabilityIndex by rememberSaveable { mutableIntStateOf(0) }
+    var radioModeIndex by rememberSaveable { mutableIntStateOf(0) }
     var crossSIMEnabled by rememberSaveable { mutableStateOf(false) }
     var voWiFiEnabled by rememberSaveable { mutableStateOf(false) }
     var voWiFiEnabledWhileRoaming by rememberSaveable { mutableStateOf(false) }
@@ -94,6 +96,8 @@ fun Config(
         reversedConfigurableItems = configurableItems.entries.associate { (k, v) -> v to k }
         voLTEEnabled = moder.isVoLteConfigEnabled
         voNREnabled = VERSION.SDK_INT >= VERSION_CODES.UPSIDE_DOWN_CAKE && moder.isVoNrConfigEnabled
+        nrAvailabilityIndex = moder.nrAvailabilityIndex
+        radioModeIndex = moder.radioModeIndex
         crossSIMEnabled = moder.isCrossSIMConfigEnabled
         voWiFiEnabled = moder.isVoWifiConfigEnabled
         voWiFiEnabledWhileRoaming = moder.isVoWifiWhileRoamingEnabled
@@ -148,6 +152,50 @@ fun Config(
     } else {
         Column(modifier = Modifier.padding(Dp(16f)).verticalScroll(scrollState)) {
             HeaderText(text = stringResource(R.string.feature_toggles))
+            RadioSelectPropertyView(
+                label = stringResource(R.string.nr_architecture),
+                values = arrayOf(
+                    stringResource(R.string.nr_off),
+                    stringResource(R.string.nr_nsa),
+                    stringResource(R.string.nr_sa),
+                    stringResource(R.string.nr_nsa_sa),
+                ),
+                selectedIndex = nrAvailabilityIndex,
+            ) { requestedArchitecture ->
+                val nrAvailabilities = when (requestedArchitecture) {
+                    1 -> intArrayOf(CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA)
+                    2 -> intArrayOf(CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA)
+                    3 -> intArrayOf(
+                        CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA,
+                        CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA,
+                    )
+                    else -> intArrayOf()
+                }
+                moder.updateCarrierConfig(
+                    CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
+                    nrAvailabilities,
+                )
+                nrAvailabilityIndex = requestedArchitecture
+            }
+
+            RadioSelectPropertyView(
+                label = stringResource(R.string.radio_mode),
+                values = arrayOf(
+                    stringResource(R.string.radio_default),
+                    stringResource(R.string.radio_5g_preferred),
+                    stringResource(R.string.radio_nr_only),
+                ),
+                selectedIndex = radioModeIndex,
+            ) { requestedMode ->
+                if (moder.setRadioMode(requestedMode)) {
+                    radioModeIndex = requestedMode
+                }
+            }
+            ClickablePropertyView(
+                label = stringResource(R.string.radio_warning),
+                value = "",
+            )
+
             BooleanPropertyView(label = stringResource(R.string.enable_volte), toggled = voLTEEnabled) {
                 voLTEEnabled =
                     if (voLTEEnabled) {
