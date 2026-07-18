@@ -2,7 +2,7 @@
 
 Pixel IMS 5G is an experimental, Shizuku-powered Android app for Google Tensor Pixels. This build is tested on a Pixel 7 Pro running Android 17.
 
-Version 0.7 adds per-SIM radio profiles, selectable band chips, IMS failure diagnosis, exact last-change rollback, and a guarded restore-and-reboot recovery action. The app uses model-independent Android telephony interfaces across Tensor Pixel generations; the optional LTE CA readout appears only when the Samsung SLSI service is exposed.
+Version 0.8 adds per-SIM Easy Mode for VoLTE and LTE carrier aggregation. Easy Mode applies automatic bands, LTE+NR allowance, enhanced LTE configuration, and the Tensor modem CA node together, then locks advanced controls until switched off. Detected bands remain green even when Automatic selection is active.
 
 ## Features
 
@@ -22,7 +22,8 @@ Version 0.7 adds per-SIM radio profiles, selectable band chips, IMS failure diag
 - Check GitHub Releases and download signed APK updates from inside the app.
 - Reset band selection to automatic at any time.
 - Use round Auto, Force NSA, and Force SA choices per SIM.
-- Highlight a selected band in green when the modem currently reports signal on it.
+- Highlight every modem-reported band in green, selected or not and including Automatic mode.
+- Apply VoLTE and LTE CA through Easy Mode and grey out advanced controls while it is active.
 - Diagnose common IMS failures and restore Google/carrier defaults from a FIX action.
 - Undo the last radio or band change when it removes cellular service.
 - Restore all active SIMs, clear app recovery data, and reboot from the top recovery action.

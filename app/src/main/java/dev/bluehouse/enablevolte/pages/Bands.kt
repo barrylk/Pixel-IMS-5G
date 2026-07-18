@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -55,10 +58,13 @@ private val TENSOR_NR_BANDS = intArrayOf(
 private fun IntArray.bandText(): String = joinToString(", ")
 
 @Composable
-private fun RadioProfileChoice(label: String, selected: Boolean, onClick: () -> Unit) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+private fun RadioProfileChoice(label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    GlassSurface(
+        modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.42f),
+        onClick = if (enabled) onClick else null,
+    ) {
         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            RadioButton(selected = selected, onClick = onClick)
+            RadioButton(selected = selected, enabled = enabled, onClick = if (enabled) onClick else null)
             Text(label, modifier = Modifier.padding(top = 12.dp), fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
         }
     }
@@ -71,6 +77,7 @@ private fun BandPicker(
     catalogue: IntArray,
     selected: Set<Int>,
     detected: Set<Int>,
+    enabled: Boolean,
     onToggle: (Int) -> Unit,
 ) {
     val choices = (catalogue.toSet() + selected + detected).sorted()
@@ -79,16 +86,19 @@ private fun BandPicker(
             val hasSignal = band in detected
             FilterChip(
                 selected = band in selected,
+                enabled = enabled,
                 onClick = { onToggle(band) },
                 label = { Text("$prefix$band") },
                 leadingIcon = if (band in selected) {
                     { Icon(Icons.Filled.Check, contentDescription = null) }
                 } else null,
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    labelColor = MaterialTheme.colorScheme.onSurface,
+                    containerColor = if (hasSignal) Color(0xFF198754) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    labelColor = if (hasSignal) Color.White else MaterialTheme.colorScheme.onSurface,
                     selectedContainerColor = if (hasSignal) Color(0xFF198754) else MaterialTheme.colorScheme.surfaceContainerHighest,
                     selectedLabelColor = if (hasSignal) Color.White else MaterialTheme.colorScheme.onSurface,
+                    disabledContainerColor = if (hasSignal) Color(0xFF198754).copy(alpha = 0.38f) else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.38f),
+                    disabledLabelColor = if (hasSignal) Color.White.copy(alpha = 0.65f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 ),
             )
         }
@@ -107,6 +117,8 @@ fun Bands(subId: Int) {
     var detectedNr by remember { mutableStateOf(emptySet<Int>()) }
     var currentSelection by rememberSaveable { mutableStateOf(context.getString(R.string.band_automatic)) }
     var radioMode by rememberSaveable { mutableStateOf(0) }
+    var easyMode by rememberSaveable { mutableStateOf(false) }
+    var easyModeBusy by rememberSaveable { mutableStateOf(false) }
     var caStatus by rememberSaveable { mutableStateOf(context.getString(R.string.checking)) }
     var servingBands by rememberSaveable { mutableStateOf(context.getString(R.string.checking)) }
     var visibleBands by rememberSaveable { mutableStateOf(context.getString(R.string.checking)) }
@@ -119,6 +131,7 @@ fun Bands(subId: Int) {
             selectedLte = selection.lteBands.toSet()
             selectedNr = selection.nrBands.toSet()
             radioMode = withContext(Dispatchers.IO) { moder.radioModeIndex }
+            easyMode = withContext(Dispatchers.IO) { moder.easyModeEnabled }
             currentSelection = if (selection.lteBands.isEmpty() && selection.nrBands.isEmpty()) {
                 context.getString(R.string.band_automatic)
             } else {
@@ -177,6 +190,24 @@ fun Bands(subId: Int) {
         }
     }
 
+    fun toggleEasyMode(enabled: Boolean) {
+        if (easyModeBusy) return
+        scope.launch {
+            easyModeBusy = true
+            val result = withContext(Dispatchers.IO) { moder.setEasyMode(enabled) }
+            easyMode = enabled && result.applied
+            val message = when {
+                !enabled -> R.string.easy_mode_advanced_unlocked
+                result.applied && result.caEnabled == true -> R.string.easy_mode_enabled
+                result.applied -> R.string.easy_mode_enabled_ca_unavailable
+                else -> R.string.easy_mode_failed
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            easyModeBusy = false
+            loadSelection()
+        }
+    }
+
     LaunchedEffect(subId) { loadSelection() }
 
     Column(
@@ -198,11 +229,30 @@ fun Bands(subId: Int) {
             }
         }
 
+        HeaderText(text = stringResource(R.string.easy_mode))
+        GlassSurface(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { toggleEasyMode(!easyMode) },
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.easy_volte_ca), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.easy_mode_description))
+                }
+                Switch(checked = easyMode, enabled = !easyModeBusy, onCheckedChange = ::toggleEasyMode)
+            }
+        }
+        if (easyMode) Text(stringResource(R.string.easy_mode_locked_notice), color = MaterialTheme.colorScheme.primary)
+
         HeaderText(text = stringResource(R.string.radio_profile))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.weight(1f)) { RadioProfileChoice(stringResource(R.string.auto), radioMode == 0) { setProfile(0) } }
-            Column(Modifier.weight(1f)) { RadioProfileChoice(stringResource(R.string.force_nsa), radioMode == 1) { setProfile(1) } }
-            Column(Modifier.weight(1f)) { RadioProfileChoice(stringResource(R.string.force_sa), radioMode == 2) { setProfile(2) } }
+            Column(Modifier.weight(1f)) { RadioProfileChoice(stringResource(R.string.auto), radioMode == 0, !easyMode) { setProfile(0) } }
+            Column(Modifier.weight(1f)) { RadioProfileChoice(stringResource(R.string.force_nsa), radioMode == 1, !easyMode) { setProfile(1) } }
+            Column(Modifier.weight(1f)) { RadioProfileChoice(stringResource(R.string.force_sa), radioMode == 2, !easyMode) { setProfile(2) } }
         }
 
         ClickablePropertyView(label = stringResource(R.string.tensor_lte_ca), value = caStatus)
@@ -215,26 +265,30 @@ fun Bands(subId: Int) {
         RadioProfileChoice(
             label = stringResource(R.string.automatic_band_selection),
             selected = selectedLte.isEmpty() && selectedNr.isEmpty(),
+            enabled = !easyMode,
             onClick = { applySelection(intArrayOf(), intArrayOf()) },
         )
         ClickablePropertyView(label = stringResource(R.string.current_bands), value = currentSelection)
         Text(stringResource(R.string.band_color_legend))
 
         HeaderText(text = stringResource(R.string.lte_bands))
-        BandPicker("B", TENSOR_LTE_BANDS, selectedLte, detectedLte) { band ->
+        BandPicker("B", TENSOR_LTE_BANDS, selectedLte, detectedLte, !easyMode) { band ->
             selectedLte = if (band in selectedLte) selectedLte - band else selectedLte + band
         }
         Text(stringResource(R.string.selected_bands, selectedLte.sorted().joinToString(", ").ifEmpty { context.getString(R.string.none_reported) }))
 
         HeaderText(text = stringResource(R.string.nr_bands))
-        BandPicker("n", TENSOR_NR_BANDS, selectedNr, detectedNr) { band ->
+        BandPicker("n", TENSOR_NR_BANDS, selectedNr, detectedNr, !easyMode) { band ->
             selectedNr = if (band in selectedNr) selectedNr - band else selectedNr + band
         }
         Text(stringResource(R.string.selected_bands, selectedNr.sorted().joinToString(", ").ifEmpty { context.getString(R.string.none_reported) }))
 
         Text(text = stringResource(R.string.band_warning))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { applySelection(selectedLte.sorted().toIntArray(), selectedNr.sorted().toIntArray()) }) {
+            Button(
+                enabled = !easyMode,
+                onClick = { applySelection(selectedLte.sorted().toIntArray(), selectedNr.sorted().toIntArray()) },
+            ) {
                 Text(stringResource(R.string.apply_bands))
             }
             OutlinedButton(onClick = { loadSelection() }) { Text(stringResource(R.string.refresh)) }

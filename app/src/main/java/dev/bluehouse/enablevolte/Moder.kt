@@ -209,9 +209,11 @@ class SubscriptionModer(
         private const val LAST_NR_BANDS_PREFIX = "last_nr_bands_"
         private const val LAST_NR_AVAIL_PREFIX = "last_nr_availability_"
         private const val LAST_PROFILE_MODE_PREFIX = "last_radio_profile_mode_"
+        private const val EASY_MODE_PREFIX = "easy_mode_"
         private const val OEM_RIL_SERVICE = "telephony.oem.oemrilhook"
         private const val OEM_RIL_DESCRIPTOR = "com.samsung.slsi.telephony.oem.oemrilhook.IOemRilHook"
         private const val OEM_RIL_GET_RADIO_NODE = 1
+        private const val OEM_RIL_SET_RADIO_NODE_INT = 2
         private const val TENSOR_LTE_CA_ENABLEMENT_NODE = 12300
     }
 
@@ -228,6 +230,39 @@ class SubscriptionModer(
         val registered: Boolean,
         val issue: ImsIssue,
     )
+
+    data class EasyModeResult(
+        val applied: Boolean,
+        val caEnabled: Boolean?,
+    )
+
+    val easyModeEnabled: Boolean
+        get() = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+            .getBoolean(EASY_MODE_PREFIX + subscriptionId, false)
+
+    fun setEasyMode(enabled: Boolean): EasyModeResult {
+        val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+        if (!enabled) {
+            prefs.edit().putBoolean(EASY_MODE_PREFIX + subscriptionId, false).apply()
+            return EasyModeResult(true, getTensorLteCaEnabled())
+        }
+        saveChangeSnapshot("Enabled VoLTE + LTE CA Easy Mode")
+        setBandSelectionInternal(intArrayOf(), intArrayOf())
+        setRadioMode(1, recordChange = false)
+        publishBundle {
+            it.putBoolean(CarrierConfigManager.KEY_CARRIER_VOLTE_AVAILABLE_BOOL, true)
+            it.putBoolean(CarrierConfigManager.KEY_EDITABLE_ENHANCED_4G_LTE_BOOL, true)
+            it.putBoolean(CarrierConfigManager.KEY_ENHANCED_4G_LTE_ON_BY_DEFAULT_BOOL, true)
+            it.putBoolean(CarrierConfigManager.KEY_HIDE_ENHANCED_4G_LTE_BOOL, false)
+        }
+        val caRequested = if (getTensorLteCaEnabled() == true) true else setTensorLteCaEnabled(true)
+        restartIMSRegistration()
+        Thread.sleep(750)
+        val caEnabled = getTensorLteCaEnabled()
+        val applied = isVoLteConfigEnabled && (caEnabled != false || caRequested != false)
+        prefs.edit().putBoolean(EASY_MODE_PREFIX + subscriptionId, applied).apply()
+        return EasyModeResult(applied, caEnabled)
+    }
 
     val radioModeIndex: Int
         get() {
@@ -587,6 +622,7 @@ class SubscriptionModer(
             clearCarrierConfig()
             context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE).edit()
                 .remove(ORIGINAL_NR_AVAIL_PREFIX + subscriptionId)
+                .remove(EASY_MODE_PREFIX + subscriptionId)
                 .apply()
             clearLastChange()
             Thread.sleep(500)
@@ -617,6 +653,36 @@ class SubscriptionModer(
             }
         } catch (e: Exception) {
             Log.w(TAG, "Unable to read Tensor LTE CA status", e)
+            null
+        } finally {
+            reply.recycle()
+            data.recycle()
+        }
+    }
+
+    /** Requests the Tensor modem CA node and verifies the value through the matching getter. */
+    fun setTensorLteCaEnabled(enabled: Boolean): Boolean? {
+        val service = SystemServiceHelper.getSystemService(OEM_RIL_SERVICE) ?: return null
+        val binder: IBinder = ShizukuBinderWrapper(service)
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(OEM_RIL_DESCRIPTOR)
+            data.writeInt(TENSOR_LTE_CA_ENABLEMENT_NODE)
+            data.writeInt(if (enabled) 1 else 0)
+            data.writeInt(simSlotIndex)
+            if (!binder.transact(OEM_RIL_SET_RADIO_NODE_INT, data, reply, 0)) return false
+            reply.readException()
+            val accepted = reply.readBoolean()
+            Thread.sleep(300)
+            val verified = getTensorLteCaEnabled()
+            when {
+                verified == enabled -> true
+                !accepted -> false
+                else -> null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to set Tensor LTE CA status", e)
             null
         } finally {
             reply.recycle()
