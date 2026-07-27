@@ -34,6 +34,7 @@ import android.telephony.TelephonyFrameworkInitializer
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.android.internal.telephony.ICarrierConfigLoader
+import com.android.internal.telephony.IBooleanConsumer
 import com.android.internal.telephony.IPhoneSubInfo
 import com.android.internal.telephony.ISub
 import com.android.internal.telephony.ITelephony
@@ -43,6 +44,7 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 object InterfaceCache {
     val cache = HashMap<String, IInterface>()
@@ -218,6 +220,9 @@ class SubscriptionModer(
         private const val LAST_NR_AVAIL_PREFIX = "last_nr_availability_"
         private const val LAST_PROFILE_MODE_PREFIX = "last_radio_profile_mode_"
         private const val LAST_CA_PREFIX = "last_tensor_ca_"
+        private const val CACHED_LTE_BANDS_PREFIX = "cached_lte_bands_"
+        private const val CACHED_NR_BANDS_PREFIX = "cached_nr_bands_"
+        private const val BAND_CACHE_VALID_PREFIX = "band_cache_valid_"
         private const val EASY_MODE_PREFIX = "easy_mode_"
         private const val ORIGINAL_CA_PREFIX = "original_tensor_ca_"
         private const val ROOT_FORCE_ACTIVE_PREFIX = "root_force_active_"
@@ -302,6 +307,7 @@ class SubscriptionModer(
     data class ShizukuRegionalResult(
         val applied: Boolean,
         val failedGates: List<String>,
+        val limitations: List<String>,
         val report: RootForceReport,
     )
 
@@ -443,31 +449,50 @@ class SubscriptionModer(
         }
     }
 
-    fun undoLastChange(): Boolean {
+    fun undoLastChange(restoreBands: Boolean = true): Boolean {
         val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
         if (!prefs.contains(LAST_ACTION_PREFIX + subscriptionId)) return false
         val phone = this.loadCachedInterface { telephony }
+        var restored = true
         val user = prefs.getLong(LAST_USER_MASK_PREFIX + subscriptionId, -1L)
         val carrier = prefs.getLong(LAST_CARRIER_MASK_PREFIX + subscriptionId, -1L)
-        if (user >= 0) setAllowedNetworkTypesForReason(phone, TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER, user)
-        if (carrier >= 0) setAllowedNetworkTypesForReason(phone, TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER, carrier)
-        updateCarrierConfig(
-            CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
-            decode(prefs.getString(LAST_NR_AVAIL_PREFIX + subscriptionId, "")),
-        )
-        setBandSelectionInternal(
-            decode(prefs.getString(LAST_LTE_BANDS_PREFIX + subscriptionId, "")),
-            decode(prefs.getString(LAST_NR_BANDS_PREFIX + subscriptionId, "")),
-        )
+        if (user >= 0) {
+            restored = runCatching {
+                setAllowedNetworkTypesForReason(phone, TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER, user)
+            }.getOrDefault(false) && restored
+        }
+        if (carrier >= 0) {
+            restored = runCatching {
+                setAllowedNetworkTypesForReason(phone, TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER, carrier)
+            }.getOrDefault(false) && restored
+        }
+        restored = runCatching {
+            updateCarrierConfig(
+                CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
+                decode(prefs.getString(LAST_NR_AVAIL_PREFIX + subscriptionId, "")),
+            )
+        }.isSuccess && restored
+        // Some Pixel 6 radio builds reject system-selection-channel reads and resets. Continue
+        // restoring all other gates and report the band limitation instead of abandoning rollback.
+        if (restoreBands) {
+            restored = runCatching {
+                setBandSelectionInternal(
+                    decode(prefs.getString(LAST_LTE_BANDS_PREFIX + subscriptionId, "")),
+                    decode(prefs.getString(LAST_NR_BANDS_PREFIX + subscriptionId, "")),
+                )
+            }.getOrDefault(false) && restored
+        }
         prefs.edit().putInt(
             PROFILE_MODE_PREFIX + subscriptionId,
             prefs.getInt(LAST_PROFILE_MODE_PREFIX + subscriptionId, 0),
         ).apply()
         prefs.getInt(LAST_CA_PREFIX + subscriptionId, -1).takeIf { it >= 0 }?.let {
-            setTensorLteCaEnabled(it == 1)
+            val caRestored = runCatching { setTensorLteCaEnabled(it == 1) }.getOrNull()
+            if (caRestored == false) restored = false
         }
         clearLastChange(prefs)
-        return true
+        runCatching { restartIMSRegistration() }
+        return restored
     }
 
     private fun clearLastChange(prefs: android.content.SharedPreferences = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)) {
@@ -506,6 +531,8 @@ class SubscriptionModer(
     data class BandSelection(
         val lteBands: IntArray,
         val nrBands: IntArray,
+        val modemReadbackAvailable: Boolean = true,
+        val knownSelection: Boolean = true,
     )
 
     data class RadioDiagnostics(
@@ -1009,7 +1036,20 @@ class SubscriptionModer(
     }
 
     fun getBandSelection(): BandSelection {
-        val specifiers = this.loadCachedInterface { telephony }.getSystemSelectionChannels(subscriptionId)
+        return try {
+            readBandSelectionFromModem().also(::cacheBandSelection)
+        } catch (error: IllegalStateException) {
+            // Pixel 6 radio implementations can support the setter while omitting the HAL 1.6
+            // getter. Android CTS explicitly treats this getter failure as optional.
+            Log.i(TAG, "Band readback is unavailable; using the last callback-confirmed selection", error)
+            getCachedBandSelection()
+        }
+    }
+
+    private fun readBandSelectionFromModem(): BandSelection {
+        val specifiers = this.loadCachedInterface { telephony }
+            .getSystemSelectionChannels(subscriptionId)
+            ?: emptyList()
         val lte = specifiers.firstOrNull {
             it.radioAccessNetwork == AccessNetworkConstants.AccessNetworkType.EUTRAN
         }?.bands ?: intArrayOf()
@@ -1017,6 +1057,26 @@ class SubscriptionModer(
             it.radioAccessNetwork == AccessNetworkConstants.AccessNetworkType.NGRAN
         }?.bands ?: intArrayOf()
         return BandSelection(lte.sortedArray(), nr.sortedArray())
+    }
+
+    private fun cacheBandSelection(selection: BandSelection) {
+        context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(CACHED_LTE_BANDS_PREFIX + subscriptionId, encode(selection.lteBands))
+            .putString(CACHED_NR_BANDS_PREFIX + subscriptionId, encode(selection.nrBands))
+            .putBoolean(BAND_CACHE_VALID_PREFIX + subscriptionId, true)
+            .apply()
+    }
+
+    private fun getCachedBandSelection(): BandSelection {
+        val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
+        val known = prefs.getBoolean(BAND_CACHE_VALID_PREFIX + subscriptionId, false)
+        return BandSelection(
+            lteBands = decode(prefs.getString(CACHED_LTE_BANDS_PREFIX + subscriptionId, "")),
+            nrBands = decode(prefs.getString(CACHED_NR_BANDS_PREFIX + subscriptionId, "")),
+            modemReadbackAvailable = false,
+            knownSelection = known,
+        )
     }
 
     fun setBandSelection(
@@ -1034,30 +1094,48 @@ class SubscriptionModer(
         lteBands: IntArray,
         nrBands: IntArray,
     ): Boolean {
+        val normalizedLte = lteBands.distinct().sorted().toIntArray()
+        val normalizedNr = nrBands.distinct().sorted().toIntArray()
         val specifiers = mutableListOf<RadioAccessSpecifier>()
-        if (lteBands.isNotEmpty()) {
+        if (normalizedLte.isNotEmpty()) {
             specifiers.add(
                 RadioAccessSpecifier(
                     AccessNetworkConstants.AccessNetworkType.EUTRAN,
-                    lteBands.distinct().sorted().toIntArray(),
+                    normalizedLte,
                     intArrayOf(),
                 ),
             )
         }
-        if (nrBands.isNotEmpty()) {
+        if (normalizedNr.isNotEmpty()) {
             specifiers.add(
                 RadioAccessSpecifier(
                     AccessNetworkConstants.AccessNetworkType.NGRAN,
-                    nrBands.distinct().sorted().toIntArray(),
+                    normalizedNr,
                     intArrayOf(),
                 ),
             )
         }
-        this.loadCachedInterface { telephony }.setSystemSelectionChannels(specifiers, subscriptionId, null)
-        Thread.sleep(750)
-        val applied = getBandSelection()
-        return applied.lteBands.contentEquals(lteBands.distinct().sorted().toIntArray()) &&
-            applied.nrBands.contentEquals(nrBands.distinct().sorted().toIntArray())
+        val result = AtomicReference<Boolean?>(null)
+        val latch = CountDownLatch(1)
+        val callback = object : IBooleanConsumer.Stub() {
+            override fun accept(accepted: Boolean) {
+                result.set(accepted)
+                latch.countDown()
+            }
+        }
+        this.loadCachedInterface { telephony }
+            .setSystemSelectionChannels(specifiers, subscriptionId, callback)
+        if (!latch.await(3, TimeUnit.SECONDS) || result.get() != true) return false
+
+        val acceptedSelection = BandSelection(normalizedLte, normalizedNr)
+        cacheBandSelection(acceptedSelection)
+        val readback = try {
+            readBandSelectionFromModem()
+        } catch (_: IllegalStateException) {
+            return true
+        }
+        return readback.lteBands.contentEquals(normalizedLte) &&
+            readback.nrBands.contentEquals(normalizedNr)
     }
 
     fun diagnoseIms(): ImsDiagnosis {
@@ -1150,14 +1228,49 @@ class SubscriptionModer(
         }
         saveChangeSnapshot("Applied Shizuku regional 5G profile")
         val failed = mutableListOf<String>()
+        val limitations = mutableListOf<String>()
         val phone = this.loadCachedInterface { telephony }
         val requiredTypes =
             TelephonyManager.NETWORK_TYPE_BITMASK_LTE or TelephonyManager.NETWORK_TYPE_BITMASK_NR
 
-        runCatching { setBandSelectionInternal(intArrayOf(), intArrayOf()) }
-            .onFailure { failed += "Automatic bands" }
+        // Pixel 6 radio implementations can reject the system-selection-channel API even
+        // though all Android-side NR and IMS gates below remain configurable. Band reset is
+        // therefore best-effort and must not make the regional profile report total failure.
+        val automaticBandsRestored = runCatching {
+            setBandSelectionInternal(intArrayOf(), intArrayOf())
+        }.onFailure {
+            Log.i(TAG, "Automatic band reset is unavailable; preserving the current selection", it)
+        }.getOrDefault(false)
+        if (!automaticBandsRestored) {
+            limitations += "Automatic bands unchanged (modem API unavailable)"
+        }
         if (!runCatching { setRadioMode(1, recordChange = false) }.getOrDefault(false)) {
             failed += "LTE + NR allowed-network policy"
+        }
+        val endcControlAvailable = runCatching {
+            phone.isRadioInterfaceCapabilitySupported(
+                TelephonyManager.CAPABILITY_NR_DUAL_CONNECTIVITY_CONFIGURATION_AVAILABLE,
+            )
+        }.getOrNull()
+        if (endcControlAvailable == true) {
+            val endcResult = runCatching {
+                phone.setNrDualConnectivityState(
+                    subscriptionId,
+                    TelephonyManager.NR_DUAL_CONNECTIVITY_ENABLE,
+                )
+            }.getOrNull()
+            if (endcResult != TelephonyManager.ENABLE_NR_DUAL_CONNECTIVITY_SUCCESS) {
+                failed += "EN-DC control (result ${endcResult ?: "unreadable"})"
+            } else {
+                Thread.sleep(500)
+                if (!runCatching { phone.isNrDualConnectivityEnabled(subscriptionId) }.getOrDefault(false)) {
+                    failed += "EN-DC enablement did not persist"
+                }
+            }
+        } else if (endcControlAvailable == false) {
+            Log.i(TAG, "The modem HAL does not expose configurable NR dual connectivity")
+        } else {
+            failed += "EN-DC control status"
         }
         runCatching { restartIMSRegistration() }.onFailure { failed += "IMS restart" }
         runCatching {
@@ -1207,17 +1320,23 @@ class SubscriptionModer(
         return ShizukuRegionalResult(
             applied = failed.isEmpty() && gatesOpen && report.carrierNsa,
             failedGates = failed.distinct(),
+            limitations = limitations.distinct(),
             report = report,
         )
     }
 
+    fun getNrDualConnectivityEnabled(): Boolean? =
+        runCatching {
+            this.loadCachedInterface { telephony }.isNrDualConnectivityEnabled(subscriptionId)
+        }.getOrNull()
+
     /** Returns null on devices without Samsung SLSI's OEM radio service. */
     fun getTensorLteCaEnabled(): Boolean? {
-        val service = SystemServiceHelper.getSystemService(OEM_RIL_SERVICE) ?: return null
-        val binder: IBinder = PrivilegeManager.wrapService(OEM_RIL_SERVICE, service)
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
         return try {
+            val service = SystemServiceHelper.getSystemService(OEM_RIL_SERVICE) ?: return null
+            val binder: IBinder = PrivilegeManager.wrapService(OEM_RIL_SERVICE, service)
             data.writeInterfaceToken(OEM_RIL_DESCRIPTOR)
             data.writeInt(TENSOR_LTE_CA_ENABLEMENT_NODE)
             data.writeInt(simSlotIndex)
@@ -1239,11 +1358,11 @@ class SubscriptionModer(
 
     /** Requests the Tensor modem CA node and verifies the value through the matching getter. */
     fun setTensorLteCaEnabled(enabled: Boolean): Boolean? {
-        val service = SystemServiceHelper.getSystemService(OEM_RIL_SERVICE) ?: return null
-        val binder: IBinder = PrivilegeManager.wrapService(OEM_RIL_SERVICE, service)
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
         return try {
+            val service = SystemServiceHelper.getSystemService(OEM_RIL_SERVICE) ?: return null
+            val binder: IBinder = PrivilegeManager.wrapService(OEM_RIL_SERVICE, service)
             data.writeInterfaceToken(OEM_RIL_DESCRIPTOR)
             data.writeInt(TENSOR_LTE_CA_ENABLEMENT_NODE)
             data.writeInt(if (enabled) 1 else 0)

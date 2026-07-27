@@ -1,12 +1,53 @@
 # Pixel IMS 5G [5G Works! : Sri Lanka]
 
-An experimental root- or Shizuku-powered IMS and radio configuration app for Google Tensor Pixel phones. It uses model-independent Android telephony interfaces for Pixel 6 through Pixel 10 and is developed and tested on a rooted Pixel 7 Pro running Android 17. [Note : You need root access to work 5G, with shizuku : VoLTE, LTE+, Bandlocking, Fieldtest, Other options are working]
+An experimental root- or Shizuku-powered IMS and radio configuration app for Google Tensor Pixel phones. It uses model-independent Android telephony interfaces for Pixel 6 through Pixel 10, supports Android 16 and Android 17, and is developed and tested on a rooted Pixel 7 Pro running Android 17. [Note : You need root access to work 5G, with shizuku : VoLTE, LTE+, Bandlocking, Fieldtest, Other options are working]
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current release: `1.0.1`. The one-time uninstall/reinstall notice applies specifically
+Current public release: `1.0.2r`. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
+
+## Version 1.0.2r interface
+
+The app is now split into four purpose-built areas so IMS/5G controls and band
+selection are easy to find:
+
+| Home | Controls |
+| --- | --- |
+| ![Pixel IMS 5G 1.0.2r Home page](docs/screenshots/pixel-ims-1.0.2r-home.png) | ![Pixel IMS 5G 1.0.2r Controls page](docs/screenshots/pixel-ims-1.0.2r-controls.png) |
+| **Field Test** | **Aggressive 5G test** |
+| ![Pixel IMS 5G 1.0.2r Field Test page](docs/screenshots/pixel-ims-1.0.2r-field-test.png) | ![Pixel IMS 5G 1.0.2r Aggressive 5G test confirmation](docs/screenshots/pixel-ims-1.0.2r-aggressive-5g.png) |
+
+The complete safety workflow is also available inside the app:
+
+![Pixel IMS 5G 1.0.2r How to use guide](docs/screenshots/pixel-ims-1.0.2r-how-to.png)
+
+## How to use
+
+1. Open **Home** and confirm the intended Root or Shizuku backend is running,
+   privileged access is granted, and the correct SIM is detected.
+2. Open **Controls**. Use **IMS & 5G controls** for VoLTE, VoWiFi, VoNR,
+   NSA/SA, CarrierConfig and recovery. Use **Band selection & LTE+** for Easy
+   Mode, automatic/NSA/SA preference, carrier aggregation and band selection.
+3. Leave bands on **Automatic** first. A selected band is only an allow-list;
+   the modem and network still decide the serving band and CA combination.
+4. Use **Monitor** for read-only live IMS, IWLAN/VoWiFi, LTE+, 5G, serving-cell,
+   neighbor-cell, signal-history and attach-trace evidence.
+5. At a known 5G site, open **Field Test**. Run the standard two-minute test
+   first. If needed, run **Aggressive 5G test**; it temporarily opens supported
+   Android-side LTE/NR gates, makes small connectivity requests and restores the
+   captured settings when it completes or is stopped.
+6. Review exported reports before sharing: phone numbers, IMSI and ICCID are
+   excluded, but cell IDs and radio measurements can indicate approximate
+   location.
+7. If service disappears after a change, use the offered **Undo** action. Use
+   the power-button recovery only when you want to restore all active SIMs,
+   clear the app recovery state and reboot.
+
+Aggressive mode cannot lower network-controlled RSRP/RSRQ/SINR attachment
+thresholds, create coverage, grant carrier entitlement, or make an LTE cell
+advertise EN-DC. Do not run it during an emergency call.
 
 ## Verified 5G field result
 
@@ -30,6 +71,7 @@ carrier policy all affect whether 5G attaches and how fast it runs.
 - Show live serving radio, LTE/NR bands, NR advertisement and EN-DC eligibility.
 - Actively refresh cell measurements and infer omitted bands from EARFCN/NR-ARFCN.
 - Request LTE/NR band restrictions and detect when Pixel firmware rejects them.
+- On Pixel 6 modems without live band readback, apply restrictions through Android's result callback and retain the last callback-confirmed selection.
 - Select LTE and NR bands using chips; every currently reported band stays green, including in Automatic mode.
 - Enable per-SIM Easy Mode to apply VoLTE, enhanced LTE/LTE+, automatic bands, LTE+NR allowance, and verified Tensor CA enablement together.
 - Lock advanced radio and band controls while Easy Mode is active, then unlock them without disabling calling settings.
@@ -48,17 +90,23 @@ carrier policy all affect whether 5G attaches and how fast it runs.
 - Use a per-SIM Root Force Lab to snapshot, force, audit, verify, and restore every Android-side LTE/NR gate exposed on Android 17.
 - In Magisk Root mode, validate and stage a reversible systemless Tensor `cfg.db` wildcard/PTCRB compatibility mapping using the phone's own firmware database. The app refuses unknown schemas and never spoofs the SIM, PLMN, or Wi-Fi country.
 - Run a two-minute, 24-sample 5G field test and export a privacy-labelled report to `Downloads/Pixel IMS 5G` with NRARFCN/frequency, SS/CSI measurements, registration/reject state, callback events, PCC/SCC history, CarrierConfig gates, and sanitized root evidence.
+- Run a separate Aggressive 5G field test that temporarily opens supported Android-side LTE/NR gates, keeps data active with small connectivity checks, captures the same detailed evidence, and restores the pre-test settings even when stopped.
 - Use the separate Monitoring section for TelephonyRegistry events, evidence-based 5G attach tracing, effective-vs-Android-default CarrierConfig differences, NR capability decoding, and root-only PCC/SCC physical channels.
 - In Root mode, capture sanitized TelephonyRegistry, phone-service, and radio-log evidence. Shizuku mode clearly marks phone-process and `READ_PRECISE_PHONE_STATE` internals as unavailable.
 - Display LTE+ only when Android confirms carrier aggregation, 5G NSA/SA only from connected NR state, and VoWiFi only from active IMS-over-IWLAN registration.
 
-## Shizuku regional compatibility on Android 17
+## Shizuku regional compatibility on Android 16 and 17
 
-Version 1.0.1 adds a dedicated Shizuku regional profile. It applies and verifies the
+The dedicated Shizuku regional profile applies and verifies the
 strongest reversible Android-side changes available to UID 2000: automatic bands,
 LTE + NR user/carrier policies, NSA + SA CarrierConfig, VoLTE, VoWiFi, VoNR, LTE+ and
 IMS visibility. The result screen reads the effective NR modes and network gates back
 instead of treating a Binder call as proof of success.
+
+On Pixel 6 firmware that rejects current-band readback, 1.0.2r keeps the Bands page
+open, uses callback-confirmed selection state, and treats an unavailable Automatic
+Bands reset as a clearly reported limitation instead of failing the complete Shizuku
+regional profile.
 
 This profile is not the Tensor `cfg.db` modem patch. The paired field-test reports show
 that the modem profile change—not the identical Android CarrierConfig—was the decisive

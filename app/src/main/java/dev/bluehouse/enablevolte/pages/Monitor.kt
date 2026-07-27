@@ -1,7 +1,6 @@
 package dev.bluehouse.enablevolte.pages
 
 import android.content.Context
-import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiInfo
@@ -43,8 +42,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.R
-import dev.bluehouse.enablevolte.FieldTestReporter
-import dev.bluehouse.enablevolte.FieldTestResult
 import dev.bluehouse.enablevolte.SriLankaCarrierProfiles
 import dev.bluehouse.enablevolte.SubscriptionModer
 import dev.bluehouse.enablevolte.components.GlassSurface
@@ -67,10 +64,6 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
     var error by remember { mutableStateOf<String?>(null) }
     var history by remember(selectedSubId) { mutableStateOf(listOf<Int>()) }
     var profileResult by remember { mutableStateOf<String?>(null) }
-    var fieldTestRunning by remember { mutableStateOf(false) }
-    var fieldTestProgress by remember { mutableStateOf(0) }
-    var fieldTestResult by remember { mutableStateOf<FieldTestResult?>(null) }
-    var fieldTestError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(selectedSubId) {
         if (selectedSubId < 0) return@LaunchedEffect
@@ -110,63 +103,6 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
                         profileResult = null
                     },
                     label = { Text(subscription.uniqueName) },
-                )
-            }
-        }
-
-        GlassSurface(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.field_test), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.field_test_description))
-                Button(
-                    enabled = selectedSubscription != null && !fieldTestRunning,
-                    onClick = {
-                        val subscription = selectedSubscription ?: return@Button
-                        scope.launch {
-                            fieldTestRunning = true
-                            fieldTestProgress = 0
-                            fieldTestError = null
-                            runCatching {
-                                FieldTestReporter.capture(context, subscription) { completed, _ ->
-                                    fieldTestProgress = completed
-                                }
-                            }.onSuccess { fieldTestResult = it }
-                                .onFailure { fieldTestError = it.message ?: context.getString(R.string.field_test_failed) }
-                            fieldTestRunning = false
-                        }
-                    },
-                ) {
-                    Text(
-                        if (fieldTestRunning) {
-                            stringResource(
-                                R.string.field_test_progress,
-                                fieldTestProgress,
-                                FieldTestReporter.SAMPLE_COUNT,
-                            )
-                        } else {
-                            stringResource(R.string.start_field_test)
-                        },
-                    )
-                }
-                fieldTestResult?.let { result ->
-                    Text(stringResource(R.string.field_test_saved, result.fileName))
-                    Text(result.summary, color = MaterialTheme.colorScheme.primary)
-                    OutlinedButton(onClick = {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_STREAM, result.uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_field_test)))
-                    }) {
-                        Text(stringResource(R.string.share_field_test))
-                    }
-                }
-                fieldTestError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                Text(
-                    stringResource(R.string.field_test_privacy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

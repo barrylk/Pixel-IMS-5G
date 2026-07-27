@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -59,10 +61,13 @@ import androidx.navigation.compose.rememberNavController
 import dev.bluehouse.enablevolte.components.OnLifecycleEvent
 import dev.bluehouse.enablevolte.components.GlassBackdrop
 import dev.bluehouse.enablevolte.pages.Config
+import dev.bluehouse.enablevolte.pages.ControlsHub
 import dev.bluehouse.enablevolte.pages.Bands
 import dev.bluehouse.enablevolte.pages.DumpedConfig
 import dev.bluehouse.enablevolte.pages.Editor
 import dev.bluehouse.enablevolte.pages.Home
+import dev.bluehouse.enablevolte.pages.HowToUse
+import dev.bluehouse.enablevolte.pages.FieldTestPage
 import dev.bluehouse.enablevolte.pages.MonitoringHub
 import dev.bluehouse.enablevolte.pages.About
 import dev.bluehouse.enablevolte.ui.theme.EnableVoLTETheme
@@ -282,7 +287,7 @@ fun PixelIMSApp() {
         },
         bottomBar = {
             val currentRoute = currentBackStackEntry?.destination?.route
-            if (currentRoute in setOf("home", "monitor", "config/{subId}", "bands/{subId}")) {
+            if (currentRoute in setOf("home", "controls", "monitor", "field-test", "config/{subId}", "bands/{subId}")) {
                 NavigationBar(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).clip(RoundedCornerShape(32.dp)),
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.84f),
@@ -290,8 +295,10 @@ fun PixelIMSApp() {
                 ) {
                     val currentDestination = currentBackStackEntry?.destination
                     val items = arrayListOf(
-                        Screen("home", "Controls", Icons.Filled.Home),
-                        Screen("monitor", stringResource(R.string.network_monitor), Icons.Filled.SignalCellularAlt),
+                        Screen("home", stringResource(R.string.home), Icons.Filled.Home),
+                        Screen("controls", stringResource(R.string.controls), Icons.Filled.Tune),
+                        Screen("monitor", stringResource(R.string.monitor), Icons.Filled.SignalCellularAlt),
+                        Screen("field-test", stringResource(R.string.field_test_short), Icons.Filled.Science),
                     )
 
                     items.forEach { screen ->
@@ -301,12 +308,8 @@ fun PixelIMSApp() {
                                 Text(screen.title)
                             },
                             selected = when {
-                                screen.route.startsWith("config/") ->
-                                    currentRoute in setOf("config/{subId}", "bands/{subId}") &&
-                                        currentBackStackEntry?.arguments?.getString("subId") == screen.route.substringAfter("/")
-                                screen.route.startsWith("bands/") ->
-                                    currentRoute == "bands/{subId}" &&
-                                        currentBackStackEntry?.arguments?.getString("subId") == screen.route.substringAfter("/")
+                                screen.route == "controls" ->
+                                    currentRoute in setOf("controls", "config/{subId}", "bands/{subId}")
                                 else -> currentDestination?.hierarchy?.any { it.route == screen.route } == true
                             },
                             onClick = {
@@ -337,8 +340,17 @@ fun PixelIMSApp() {
             composable("home/about", context.resources.getString(R.string.about)) {
                 About()
             }
+            composable("home/how-to", context.resources.getString(R.string.how_to_use)) {
+                HowToUse()
+            }
+            composable("controls", context.resources.getString(R.string.controls)) {
+                ControlsHub(subscriptions, navController)
+            }
             composable("monitor", context.resources.getString(R.string.network_monitor)) {
                 MonitoringHub(subscriptions)
+            }
+            composable("field-test", context.resources.getString(R.string.field_test)) {
+                FieldTestPage(subscriptions)
             }
             composable("config/{subId}", context.resources.getString(R.string.sim_config)) { entry ->
                 entry.arguments?.getString("subId")?.toIntOrNull()?.let { Config(navController, it) }

@@ -78,6 +78,7 @@ object FieldTestReporter {
     suspend fun capture(
         context: Context,
         subscription: SubscriptionInfo,
+        modeLabel: String = "Standard diagnostic",
         onProgress: (Int, Int) -> Unit,
     ): FieldTestResult {
         val moder = SubscriptionModer(context, subscription.subscriptionId)
@@ -153,6 +154,7 @@ object FieldTestReporter {
                 callbackRegistered,
                 rootAtStart,
                 rootAtEnd,
+                modeLabel,
             )
         }
         val safeReport = REPORT_SENSITIVE_FIELD.replace(report) { match ->
@@ -219,6 +221,7 @@ object FieldTestReporter {
         callbackRegistered: Boolean,
         rootAtStart: Map<String, String?>,
         rootAtEnd: Map<String, String?>,
+        modeLabel: String,
     ): String {
         val radios = samples.map { it.radio }
         val first = radios.first()
@@ -244,6 +247,7 @@ object FieldTestReporter {
             appendLine("Security patch: ${Build.VERSION.SECURITY_PATCH}")
             appendLine("Baseband: ${Build.getRadioVersion().orEmpty()}")
             appendLine("Privilege backend: ${PrivilegeManager.activeMode}")
+            appendLine("Test mode: $modeLabel")
             appendLine()
             appendLine("SIM AND CARRIER (phone number, IMSI and ICCID intentionally excluded)")
             appendLine("Name: ${subscription.uniqueName}")
@@ -261,6 +265,7 @@ object FieldTestReporter {
             appendLine("Show VoWiFi icon: ${moder.getBooleanValue(CarrierConfigManager.KEY_SHOW_WIFI_CALLING_ICON_IN_STATUS_BAR_BOOL)}")
             appendLine("Hide LTE+ icon: ${moder.getBooleanValue(CarrierConfigManager.KEY_HIDE_LTE_PLUS_DATA_ICON_BOOL)}")
             appendLine("Tensor CA node: ${moder.getTensorLteCaEnabled() ?: "unavailable"}")
+            appendLine("NR dual connectivity enabled: ${moder.getNrDualConnectivityEnabled() ?: "unavailable"}")
             appendLine(
                 "Radio HAL EN-DC control capability: " +
                     runCatching {
@@ -274,6 +279,15 @@ object FieldTestReporter {
             appendLine(
                 "Band restriction: LTE=${bands.lteBands.joinToString().ifBlank { "automatic" }}; " +
                     "NR=${bands.nrBands.joinToString().ifBlank { "automatic" }}",
+            )
+            appendLine(
+                "Band readback: available=${bands.modemReadbackAvailable}; " +
+                    "selection-known=${bands.knownSelection}; " +
+                    "source=${when {
+                        bands.modemReadbackAvailable -> "live modem"
+                        bands.knownSelection -> "callback-confirmed cache"
+                        else -> "automatic assumed"
+                    }}",
             )
             gates.gates.forEach {
                 appendLine(

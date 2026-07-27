@@ -1,5 +1,6 @@
 package dev.bluehouse.enablevolte.pages
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -60,7 +61,30 @@ private val TENSOR_NR_BANDS = intArrayOf(
     70, 71, 75, 76, 77, 78, 79, 257, 258, 260, 261,
 )
 
+private const val BANDS_TAG = "Bands"
+
 private fun IntArray.bandText(): String = joinToString(", ")
+
+private fun bandFailureSummary(
+    operation: String,
+    error: Throwable,
+): String {
+    Log.w(BANDS_TAG, "$operation is unavailable", error)
+    val detail = error.message
+        ?.lineSequence()
+        ?.firstOrNull()
+        ?.take(120)
+        ?.takeIf { it.isNotBlank() }
+    return buildString {
+        append(operation)
+        append(": ")
+        append(error.javaClass.simpleName.ifBlank { "Error" })
+        if (detail != null) {
+            append(" — ")
+            append(detail)
+        }
+    }
+}
 
 @Composable
 private fun RadioProfileChoice(label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
@@ -139,74 +163,103 @@ fun Bands(
     var regionalPatch by remember { mutableStateOf<RegionalModemPatchStatus?>(null) }
     var regionalPatchBusy by rememberSaveable { mutableStateOf(false) }
     var regionalConfirmation by rememberSaveable { mutableStateOf<String?>(null) }
+    var bandLoadError by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun loadSelection() {
         scope.launch {
-            val selection = withContext(Dispatchers.IO) { moder.getBandSelection() }
-            selectedLte = selection.lteBands.toSet()
-            selectedNr = selection.nrBands.toSet()
-            radioMode = withContext(Dispatchers.IO) { moder.radioModeIndex }
-            easyMode = withContext(Dispatchers.IO) { moder.easyModeEnabled }
-            currentSelection = if (selection.lteBands.isEmpty() && selection.nrBands.isEmpty()) {
-                context.getString(R.string.band_automatic)
-            } else {
-                "LTE: ${selection.lteBands.bandText().ifEmpty { "-" }} | NR: ${selection.nrBands.bandText().ifEmpty { "-" }}"
-            }
-            caStatus = when (withContext(Dispatchers.IO) { moder.getTensorLteCaEnabled() }) {
-                true -> context.getString(R.string.lte_ca_enabled)
-                false -> context.getString(R.string.lte_ca_disabled)
-                null -> context.getString(R.string.lte_ca_unavailable)
-            }
-            val radio = withContext(Dispatchers.IO) { moder.getRadioDiagnostics() }
-            detectedLte = radio.lteBands.toSet()
-            detectedNr = radio.nrBands.toSet()
-            servingBands = buildString {
-                append(radio.dataRat)
-                if (radio.servingLteBands.isNotEmpty()) append(" • LTE B${radio.servingLteBands.bandText()}")
-                if (radio.servingNrBands.isNotEmpty()) append(" • NR n${radio.servingNrBands.bandText()}")
-            }
-            visibleBands = context.getString(
-                R.string.visible_bands_value,
-                radio.lteBands.bandText().ifEmpty { context.getString(R.string.none_reported) },
-                radio.nrBands.bandText().ifEmpty { context.getString(R.string.none_reported) },
-            )
-            nrAttachStatus = when {
-                radio.dataRat == "NR" -> context.getString(R.string.sa_connected)
-                radio.endcAvailable == true -> context.getString(R.string.nsa_attach_available)
-                radio.nrAvailable == true -> context.getString(R.string.nr_advertised_no_endc)
-                radio.nrAvailable == false -> context.getString(R.string.nr_not_advertised)
-                else -> context.getString(R.string.status_unknown)
-            }
-            rootForceReport = if (
-                PrivilegeManager.activeMode == PrivilegeMode.ROOT &&
-                PrivilegeManager.isRootReady()
-            ) {
-                withContext(Dispatchers.IO) { moder.getRootForceReport(radio) }
-            } else {
-                null
-            }
-            regionalPatch = if (
-                PrivilegeManager.activeMode == PrivilegeMode.ROOT &&
-                PrivilegeManager.isRootReady()
-            ) {
-                withContext(Dispatchers.IO) { PrivilegeManager.getRegionalModemPatchStatus() }
-            } else {
-                RegionalModemPatchStatus.unavailable(context.getString(R.string.regional_patch_root_only))
-            }
-            noServiceChange = withContext(Dispatchers.IO) {
-                if (!moder.hasCellularService()) moder.lastChangeDescription else null
+            var loadStage = "Current band restriction"
+            try {
+                bandLoadError = null
+                val selection = withContext(Dispatchers.IO) { moder.getBandSelection() }
+                selectedLte = selection.lteBands.toSet()
+                selectedNr = selection.nrBands.toSet()
+                loadStage = "Radio profile"
+                radioMode = withContext(Dispatchers.IO) { moder.radioModeIndex }
+                loadStage = "Easy mode"
+                easyMode = withContext(Dispatchers.IO) { moder.easyModeEnabled }
+                val selectionText = if (selection.lteBands.isEmpty() && selection.nrBands.isEmpty()) {
+                    context.getString(R.string.band_automatic)
+                } else {
+                    "LTE: ${selection.lteBands.bandText().ifEmpty { "-" }} | NR: ${selection.nrBands.bandText().ifEmpty { "-" }}"
+                }
+                currentSelection = when {
+                    selection.modemReadbackAvailable -> selectionText
+                    selection.knownSelection -> context.getString(R.string.band_cached_selection, selectionText)
+                    else -> context.getString(R.string.band_readback_not_supported)
+                }
+                loadStage = "Tensor LTE CA"
+                caStatus = when (withContext(Dispatchers.IO) { moder.getTensorLteCaEnabled() }) {
+                    true -> context.getString(R.string.lte_ca_enabled)
+                    false -> context.getString(R.string.lte_ca_disabled)
+                    null -> context.getString(R.string.lte_ca_unavailable)
+                }
+                loadStage = "Radio diagnostics"
+                val radio = withContext(Dispatchers.IO) { moder.getRadioDiagnostics() }
+                detectedLte = radio.lteBands.toSet()
+                detectedNr = radio.nrBands.toSet()
+                servingBands = buildString {
+                    append(radio.dataRat)
+                    if (radio.servingLteBands.isNotEmpty()) append(" • LTE B${radio.servingLteBands.bandText()}")
+                    if (radio.servingNrBands.isNotEmpty()) append(" • NR n${radio.servingNrBands.bandText()}")
+                }
+                visibleBands = context.getString(
+                    R.string.visible_bands_value,
+                    radio.lteBands.bandText().ifEmpty { context.getString(R.string.none_reported) },
+                    radio.nrBands.bandText().ifEmpty { context.getString(R.string.none_reported) },
+                )
+                nrAttachStatus = when {
+                    radio.dataRat == "NR" -> context.getString(R.string.sa_connected)
+                    radio.endcAvailable == true -> context.getString(R.string.nsa_attach_available)
+                    radio.nrAvailable == true -> context.getString(R.string.nr_advertised_no_endc)
+                    radio.nrAvailable == false -> context.getString(R.string.nr_not_advertised)
+                    else -> context.getString(R.string.status_unknown)
+                }
+                loadStage = "Root force report"
+                rootForceReport = if (
+                    PrivilegeManager.activeMode == PrivilegeMode.ROOT &&
+                    PrivilegeManager.isRootReady()
+                ) {
+                    withContext(Dispatchers.IO) { moder.getRootForceReport(radio) }
+                } else {
+                    null
+                }
+                loadStage = "Regional modem patch"
+                regionalPatch = if (
+                    PrivilegeManager.activeMode == PrivilegeMode.ROOT &&
+                    PrivilegeManager.isRootReady()
+                ) {
+                    withContext(Dispatchers.IO) { PrivilegeManager.getRegionalModemPatchStatus() }
+                } else {
+                    RegionalModemPatchStatus.unavailable(context.getString(R.string.regional_patch_root_only))
+                }
+                loadStage = "Service state"
+                noServiceChange = withContext(Dispatchers.IO) {
+                    if (!moder.hasCellularService()) moder.lastChangeDescription else null
+                }
+            } catch (error: Exception) {
+                bandLoadError = bandFailureSummary(loadStage, error)
+                currentSelection = context.getString(R.string.band_read_unavailable)
+                caStatus = context.getString(R.string.lte_ca_unavailable)
+                servingBands = context.getString(R.string.status_unknown)
+                visibleBands = context.getString(R.string.status_unknown)
+                nrAttachStatus = context.getString(R.string.status_unknown)
             }
         }
     }
 
     fun setProfile(index: Int) {
         scope.launch {
-            val accepted = withContext(Dispatchers.IO) {
-                when (index) {
-                    0 -> moder.requestAutomaticRadio()
-                    1 -> moder.requestNsaOnly()
-                    else -> moder.requestSaOnly()
+            val accepted = try {
+                withContext(Dispatchers.IO) {
+                    when (index) {
+                        0 -> moder.requestAutomaticRadio()
+                        1 -> moder.requestNsaOnly()
+                        else -> moder.requestSaOnly()
+                    }
                 }
+            } catch (error: Exception) {
+                bandLoadError = bandFailureSummary("Radio profile change", error)
+                false
             }
             Toast.makeText(context, if (accepted) R.string.nr_mode_requested else R.string.nr_mode_request_failed, Toast.LENGTH_LONG).show()
             loadSelection()
@@ -215,7 +268,12 @@ fun Bands(
 
     fun applySelection(lte: IntArray, nr: IntArray) {
         scope.launch {
-            val retained = withContext(Dispatchers.IO) { moder.setBandSelection(lte, nr) }
+            val retained = try {
+                withContext(Dispatchers.IO) { moder.setBandSelection(lte, nr) }
+            } catch (error: Exception) {
+                bandLoadError = bandFailureSummary("Band selection change", error)
+                false
+            }
             Toast.makeText(context, if (retained) R.string.band_applied else R.string.band_rejected, Toast.LENGTH_LONG).show()
             loadSelection()
         }
@@ -225,12 +283,17 @@ fun Bands(
         if (easyModeBusy) return
         scope.launch {
             easyModeBusy = true
-            val result = withContext(Dispatchers.IO) { moder.setEasyMode(enabled) }
-            easyMode = enabled && result.applied
+            val result = try {
+                withContext(Dispatchers.IO) { moder.setEasyMode(enabled) }
+            } catch (error: Exception) {
+                bandLoadError = bandFailureSummary("Easy mode change", error)
+                null
+            }
+            easyMode = enabled && result?.applied == true
             val message = when {
                 !enabled -> R.string.easy_mode_advanced_unlocked
-                result.applied && result.caEnabled == true -> R.string.easy_mode_enabled
-                result.applied -> R.string.easy_mode_enabled_ca_unavailable
+                result?.applied == true && result.caEnabled == true -> R.string.easy_mode_enabled
+                result?.applied == true -> R.string.easy_mode_enabled_ca_unavailable
                 else -> R.string.easy_mode_failed
             }
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -283,6 +346,8 @@ fun Bands(
             val result = shizukuRegionalResult
             val message = when {
                 result == null -> context.getString(R.string.profile_failed)
+                result.applied && result.limitations.isNotEmpty() ->
+                    context.getString(R.string.shizuku_regional_applied_limited)
                 result.applied -> context.getString(R.string.shizuku_regional_applied)
                 else -> context.getString(
                     R.string.shizuku_regional_partial,
@@ -369,6 +434,25 @@ fun Bands(
             }
             Button(onClick = {}, modifier = Modifier.weight(1f)) {
                 Text(stringResource(R.string.bands))
+            }
+        }
+        bandLoadError?.let { details ->
+            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.band_backend_limited_title),
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(stringResource(R.string.band_backend_limited_message))
+                    Text(details, style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = { loadSelection() }) {
+                        Text(stringResource(R.string.retry))
+                    }
+                }
             }
         }
         noServiceChange?.let { change ->
@@ -518,6 +602,12 @@ fun Bands(
                                     },
                                 )
                             }
+                        if (result.limitations.isNotEmpty()) {
+                            ClickablePropertyView(
+                                label = stringResource(R.string.modem_limitations),
+                                value = result.limitations.joinToString(),
+                            )
+                        }
                     }
                     Button(
                         enabled = !shizukuRegionalBusy,
