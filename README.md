@@ -4,7 +4,7 @@ An experimental root- or Shizuku-powered IMS and radio configuration app for Goo
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current public release: `1.0.2r`. The one-time uninstall/reinstall notice applies specifically
+Current public release: `1.0.3`. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
@@ -82,8 +82,8 @@ carrier policy all affect whether 5G attaches and how fast it runs.
 - Restore every active SIM, clear the app's recovery state, and reboot from a guarded recovery action.
 - Read the Tensor modem's LTE carrier-aggregation enablement status.
 - Material 3 Expressive interface with dynamic Pixel colors and glass surfaces.
-- Check GitHub Releases and download signed in-app updates.
-- Check GitHub Releases on launch and periodically in the background, then send one Android notification per newer signed release. Notification permission and channel settings remain under the user's control.
+- Check GitHub Releases and download signed updates inside the app with live percentage/status, followed by Android's normal installation confirmation.
+- Check GitHub Releases on launch and periodically in the background, then send one Android notification per newer signed release. Tapping **Update now** opens the in-app updater; notification permission and channel settings remain under the user's control.
 - Choose Root or Shizuku at first launch and change the backend later from About.
 - Monitor both SIMs live: IMS registration transport, VoWiFi/IWLAN state, Wi-Fi frequency, LTE/NR cells, signal metrics and history, and NSA/EN-DC advertisement.
 - Detect Dialog, SLT-MOBITEL, Airtel Lanka, and Hutch SIM identities and show conservative Sri Lankan band and activation guidance.

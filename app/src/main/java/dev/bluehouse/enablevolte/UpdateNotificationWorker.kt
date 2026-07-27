@@ -87,12 +87,15 @@ object UpdateNotificationScheduler {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (prefs.getString(LAST_NOTIFIED_VERSION, null) == release.version) return false
 
-        val releaseIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(release.pageUrl))
+        val releaseIntent = Intent(context, HomeActivity::class.java)
+            .setAction("${context.packageName}.OPEN_UPDATE_${release.version}")
+            .putExtra(HomeActivity.EXTRA_OPEN_UPDATES, true)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val pendingIntent = PendingIntent.getActivity(
             context,
-            release.version.hashCode(),
+            NOTIFICATION_ID xor release.version.hashCode(),
             releaseIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
@@ -103,6 +106,11 @@ object UpdateNotificationScheduler {
                     .bigText(context.getString(R.string.update_notification_message)),
             )
             .setContentIntent(pendingIntent)
+            .addAction(
+                R.drawable.ic_launcher_foreground,
+                context.getString(R.string.update_now),
+                pendingIntent,
+            )
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

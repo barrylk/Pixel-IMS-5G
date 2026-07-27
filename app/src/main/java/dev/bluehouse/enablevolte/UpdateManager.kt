@@ -4,9 +4,9 @@ import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.database.Cursor
 import android.net.Uri
 import android.os.Environment
-import android.widget.Toast
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -17,6 +17,18 @@ data class ReleaseInfo(
     val apkUrl: String?,
     val notes: String,
 )
+
+data class UpdateDownloadProgress(
+    val status: Int,
+    val downloadedBytes: Long,
+    val totalBytes: Long,
+    val reason: Int,
+) {
+    val fraction: Float?
+        get() = totalBytes.takeIf { it > 0 }?.let {
+            (downloadedBytes.toDouble() / it.toDouble()).coerceIn(0.0, 1.0).toFloat()
+        }
+}
 
 object UpdateManager {
     const val REPOSITORY_URL = "https://github.com/barrylk/Pixel-IMS-5G"
@@ -75,7 +87,7 @@ object UpdateManager {
 
     fun download(context: Context, release: ReleaseInfo): Long {
         val apkUrl = release.apkUrl ?: throw IllegalStateException("This release has no APK asset")
-        val fileName = "Pixel-IMS-5G-v${release.version}.apk"
+        val fileName = "Pixel-IMS-5G-v${release.version}-${System.currentTimeMillis()}.apk"
         val request = DownloadManager.Request(Uri.parse(apkUrl))
             .setTitle("Pixel IMS 5G ${release.version}")
             .setDescription("Downloading app update")
@@ -88,9 +100,46 @@ object UpdateManager {
         return id
     }
 
+    fun activeDownloadId(context: Context): Long =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(DOWNLOAD_ID, -1L)
+
+    fun downloadProgress(context: Context, id: Long = activeDownloadId(context)): UpdateDownloadProgress? {
+        if (id < 0) return null
+        val manager = context.getSystemService(DownloadManager::class.java)
+        val cursor = manager.query(DownloadManager.Query().setFilterById(id)) ?: return null
+        return cursor.use {
+            if (!it.moveToFirst()) return@use null
+            UpdateDownloadProgress(
+                status = it.int(DownloadManager.COLUMN_STATUS),
+                downloadedBytes = it.long(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR),
+                totalBytes = it.long(DownloadManager.COLUMN_TOTAL_SIZE_BYTES),
+                reason = it.int(DownloadManager.COLUMN_REASON),
+            )
+        }
+    }
+
+    fun installDownloadedUpdate(context: Context): Boolean {
+        val manager = context.getSystemService(DownloadManager::class.java)
+        val uri = manager.getUriForDownloadedFile(activeDownloadId(context)) ?: return false
+        return try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION),
+            )
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun open(context: Context, url: String) {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
+
+    private fun Cursor.int(column: String): Int = getInt(getColumnIndexOrThrow(column))
+
+    private fun Cursor.long(column: String): Long = getLong(getColumnIndexOrThrow(column))
 }
 
 class UpdateDownloadReceiver : BroadcastReceiver() {
@@ -99,16 +148,10 @@ class UpdateDownloadReceiver : BroadcastReceiver() {
         val expected = context.getSharedPreferences("github_updater", Context.MODE_PRIVATE).getLong("download_id", -1)
         val completed = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
         if (completed != expected) return
-        val manager = context.getSystemService(DownloadManager::class.java)
-        val uri = manager.getUriForDownloadedFile(completed) ?: return
-        try {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION),
-            )
-        } catch (_: Exception) {
-            Toast.makeText(context, "Update downloaded. Open Downloads to install it.", Toast.LENGTH_LONG).show()
-        }
+        context.startActivity(
+            Intent(context, HomeActivity::class.java)
+                .putExtra(HomeActivity.EXTRA_INSTALL_DOWNLOADED_UPDATE, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        )
     }
 }

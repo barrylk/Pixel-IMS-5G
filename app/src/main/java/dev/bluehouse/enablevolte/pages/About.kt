@@ -1,8 +1,10 @@
 package dev.bluehouse.enablevolte.pages
 
 import android.app.Activity
+import android.app.DownloadManager
 import android.content.Intent
 import android.provider.Settings
+import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,9 +18,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,9 +39,11 @@ import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.ReleaseInfo
 import dev.bluehouse.enablevolte.UpdateManager
+import dev.bluehouse.enablevolte.UpdateDownloadProgress
 import dev.bluehouse.enablevolte.components.ClickablePropertyView
 import dev.bluehouse.enablevolte.components.HeaderText
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -53,6 +59,8 @@ fun About() {
     var checking by rememberSaveable { mutableStateOf(false) }
     var status by rememberSaveable { mutableStateOf(context.getString(R.string.update_not_checked)) }
     var release by remember { mutableStateOf<ReleaseInfo?>(null) }
+    var downloadId by rememberSaveable { mutableStateOf(UpdateManager.activeDownloadId(context)) }
+    var downloadProgress by remember { mutableStateOf<UpdateDownloadProgress?>(null) }
 
     fun checkUpdates() {
         checking = true
@@ -70,6 +78,27 @@ fun About() {
             } finally {
                 checking = false
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        checkUpdates()
+    }
+    LaunchedEffect(downloadId) {
+        if (downloadId < 0) return@LaunchedEffect
+        while (true) {
+            val progress = withContext(Dispatchers.IO) {
+                UpdateManager.downloadProgress(context, downloadId)
+            }
+            downloadProgress = progress
+            if (
+                progress == null ||
+                progress.status == DownloadManager.STATUS_SUCCESSFUL ||
+                progress.status == DownloadManager.STATUS_FAILED
+            ) {
+                break
+            }
+            delay(500)
         }
     }
 
@@ -134,15 +163,51 @@ fun About() {
             Text(" ${stringResource(R.string.update_notification_settings)}")
         }
         release?.takeIf { UpdateManager.isNewer(it.version) && it.apkUrl != null }?.let { available ->
+            val progress = downloadProgress
+            val downloadActive = progress?.status in setOf(
+                DownloadManager.STATUS_PENDING,
+                DownloadManager.STATUS_RUNNING,
+                DownloadManager.STATUS_PAUSED,
+            )
             Button(
                 onClick = {
-                    UpdateManager.download(context, available)
+                    downloadId = UpdateManager.download(context, available)
+                    downloadProgress = null
                     status = context.getString(R.string.update_downloading, available.version)
                 },
+                enabled = !downloadActive,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Filled.Settings, contentDescription = null)
                 Text(" ${stringResource(R.string.download_install)}")
+            }
+            progress?.let { current ->
+                when (current.status) {
+                    DownloadManager.STATUS_RUNNING -> {
+                        current.fraction?.let { fraction ->
+                            LinearProgressIndicator(
+                                progress = { fraction },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } ?: LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Text(
+                            current.fraction?.let {
+                                context.getString(R.string.download_progress, (it * 100).toInt())
+                            } ?: context.getString(
+                                R.string.download_progress_unknown,
+                                Formatter.formatFileSize(context, current.downloadedBytes),
+                            ),
+                        )
+                    }
+                    DownloadManager.STATUS_PENDING ->
+                        Text(stringResource(R.string.download_waiting))
+                    DownloadManager.STATUS_PAUSED ->
+                        Text(stringResource(R.string.download_paused))
+                    DownloadManager.STATUS_SUCCESSFUL ->
+                        Text(stringResource(R.string.download_complete))
+                    DownloadManager.STATUS_FAILED ->
+                        Text(stringResource(R.string.download_failed, current.reason))
+                }
             }
         }
 
