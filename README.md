@@ -8,6 +8,66 @@ Current public release: `1.0.3`. The one-time uninstall/reinstall notice applies
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
+## Changelog
+
+### [1.0.3](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.3)
+
+- Added automatic GitHub release checks at startup and periodically in the
+  background.
+- Added a polished **New version x.x.x is available** Android notification,
+  shown once for each newer release.
+- Added an **Update now** notification action that opens the in-app GitHub
+  updater directly.
+- Added live download percentage and pending, paused, completed, and failed
+  states inside the app.
+- Added a secure installer handoff after the signed APK finishes downloading,
+  including Android's unknown-app-source permission flow when required.
+- Preserved the established package name and OTA signing identity, allowing
+  existing installations to update without uninstalling.
+
+### [1.0.2r](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.2r)
+
+- Reorganized the app into **Home**, **Controls**, **Monitor**, and
+  **Field Test** so IMS/5G and band controls are easier to find.
+- Restored the complete IMS, 5G, LTE+, carrier aggregation, radio-profile, and
+  LTE/NR band-selection controls in their dedicated sections.
+- Added standard and Aggressive 5G field-test modes with detailed evidence
+  capture, small connectivity checks, automatic restoration, and sanitized
+  report export.
+- Prevented Pixel 6 band-page crashes when Android rejects system-selection
+  channel readback. Callback-confirmed selection remains usable on supported
+  Android 16 and Android 17 builds.
+- Made Shizuku Automatic Bands failures non-fatal and clearly report modem or
+  Android restrictions instead of closing the complete regional profile.
+- Added the in-app **How to use** guide and updated interface screenshots.
+
+### [1.0.1](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.1)
+
+- Added the reversible Shizuku regional compatibility profile for Android 16
+  and Android 17.
+- Added verification of effective NR modes and network gates instead of
+  treating a successful Binder call as proof that the modem accepted a change.
+- Added documented Dialog Sri Lanka n78 NSA field results and a real-world
+  speed-test example.
+- Clarified which Android-side VoLTE, VoWiFi, LTE+, band, and field-test
+  functions work with Shizuku and which Tensor modem changes remain root-only.
+
+### [1.0.0](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.0)
+
+- Promoted the project to its first stable release under
+  `com.nirmala.pixel5gims`.
+- Expanded the privacy-labelled 5G field-test dump with NR frequency,
+  registration, CarrierConfig, callback, cell, IMS, and sanitized privileged
+  evidence.
+- Added the validated, reversible Magisk Tensor regional modem compatibility
+  patch with schema checks, database integrity verification, backup, and
+  restoration safeguards.
+- Added signed GitHub release APK support for future in-app updates.
+
+> **Upgrade note:** version `0.12.6` changed the application ID to
+> `com.nirmala.pixel5gims`, so users of the older package had to uninstall it
+> once. Updates from `0.12.6` onward, including `1.0.3`, install normally.
+
 ## Version 1.0.2r interface
 
 The app is now split into four purpose-built areas so IMS/5G controls and band
