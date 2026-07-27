@@ -1,10 +1,13 @@
 package dev.bluehouse.enablevolte
 
+import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.telephony.SubscriptionInfo
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -87,6 +90,11 @@ data class Screen(
 val NavDestination.depth: Int get() = this.route?.let { route -> route.count { it == '/' } + 1 } ?: 0
 
 class HomeActivity : ComponentActivity() {
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            UpdateNotificationScheduler.initialize(this)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -101,6 +109,30 @@ class HomeActivity : ComponentActivity() {
                 }
             }
         }
+        configureUpdateNotifications()
+    }
+
+    private fun configureUpdateNotifications() {
+        UpdateNotificationScheduler.initialize(this)
+        if (
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val prefs = getSharedPreferences("github_updater", MODE_PRIVATE)
+        if (prefs.getBoolean("notification_permission_asked", false)) return
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.update_notification_permission_title)
+            .setMessage(R.string.update_notification_permission_message)
+            .setPositiveButton(R.string.allow_notifications) { _, _ ->
+                prefs.edit().putBoolean("notification_permission_asked", true).apply()
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            .setNegativeButton(R.string.not_now) { _, _ ->
+                prefs.edit().putBoolean("notification_permission_asked", true).apply()
+            }
+            .show()
     }
 }
 

@@ -83,6 +83,7 @@ carrier policy all affect whether 5G attaches and how fast it runs.
 - Read the Tensor modem's LTE carrier-aggregation enablement status.
 - Material 3 Expressive interface with dynamic Pixel colors and glass surfaces.
 - Check GitHub Releases and download signed in-app updates.
+- Check GitHub Releases on launch and periodically in the background, then send one Android notification per newer signed release. Notification permission and channel settings remain under the user's control.
 - Choose Root or Shizuku at first launch and change the backend later from About.
 - Monitor both SIMs live: IMS registration transport, VoWiFi/IWLAN state, Wi-Fi frequency, LTE/NR cells, signal metrics and history, and NSA/EN-DC advertisement.
 - Detect Dialog, SLT-MOBITEL, Airtel Lanka, and Hutch SIM identities and show conservative Sri Lankan band and activation guidance.

@@ -66,6 +66,7 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
 
     implementation 'androidx.activity:activity-compose:1.11.0'
+    implementation 'androidx.work:work-runtime-ktx:2.10.1'
 
     implementation "androidx.navigation:navigation-compose:2.9.5"
 

@@ -1,6 +1,8 @@
 package dev.bluehouse.enablevolte.pages
 
 import android.app.Activity
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -118,6 +120,18 @@ fun About() {
         Button(onClick = { checkUpdates() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.Refresh, contentDescription = null)
             Text(if (checking) " ${stringResource(R.string.checking)}" else " ${stringResource(R.string.check_updates)}")
+        }
+        OutlinedButton(
+            onClick = {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Filled.Settings, contentDescription = null)
+            Text(" ${stringResource(R.string.update_notification_settings)}")
         }
         release?.takeIf { UpdateManager.isNewer(it.version) && it.apkUrl != null }?.let { available ->
             Button(

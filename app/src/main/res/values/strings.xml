@@ -315,6 +315,15 @@
     <string name="update_check_failed">Update check failed: %1$s</string>
     <string name="update_downloading">Downloading version %1$s; Android will ask you to approve installation</string>
     <string name="download_install">Download and install update</string>
+    <string name="update_notification_channel">App updates</string>
+    <string name="update_notification_channel_description">Notifies you when a new signed Pixel IMS 5G release is available.</string>
+    <string name="update_notification_title">Pixel IMS 5G %1$s is available</string>
+    <string name="update_notification_message">Tap to view the release and download the signed update.</string>
+    <string name="update_notification_permission_title">Get update notifications?</string>
+    <string name="update_notification_permission_message">Pixel IMS 5G can periodically check GitHub Releases and notify you once when a newer signed APK is available.</string>
+    <string name="allow_notifications">Allow notifications</string>
+    <string name="not_now">Not now</string>
+    <string name="update_notification_settings">Update notification settings</string>
     <string name="credits">Credits &amp; license</string>
     <string name="upstream_credit">Based on the original GPL Pixel IMS project by kyujin-cho and its community contributors.</string>
     <string name="modem_patch_credit">Wildcard/PTCRB Tensor cfg.db mapping research credited to the Pixel Modem Fix and Displax modem-fix projects. Pixel IMS 5G independently validates and patches the current firmware database.</string>
