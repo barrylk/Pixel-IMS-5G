@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - "gh-pages"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      # The project compiles against hidden telephony APIs, so the stock
+      # android.jar is not sufficient. Same source the release workflow uses.
+      - name: Install full Android API jar
+        run: |
+          curl --fail --location --retry 3 \
+            --output "$ANDROID_HOME/platforms/android-36/android.jar" \
+            "https://raw.githubusercontent.com/Reginer/aosp-android-jar/main/android-36/android.jar"
+
+      - name: Lint
+        run: ./gradlew ktlintCheck
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Assemble debug
+        run: ./gradlew :app:assembleDebug
+
+      # Built unsigned so this job needs no secrets and works on pull requests.
+      # The point is to exercise R8 and resource shrinking, which only run in
+      # the release variant.
+      - name: Assemble release (exercises R8)
+        run: ./gradlew :app:assembleRelease
+
+      - name: Report APK size
+        run: |
+          {
+            echo "### APK size"
+            echo
+            echo "| Variant | Size |"
+            echo "| --- | --- |"
+            for apk in $(find app/build/outputs/apk -name "*.apk" | sort); do
+              printf "| %s | %s |\n" "$(basename "$apk")" "$(du -h "$apk" | cut -f1)"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # R8 obfuscates release builds, so keep the mapping file. Without it,
+      # user-submitted crash traces cannot be read.
+      - name: Upload R8 mapping
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8-mapping
+          path: app/build/outputs/mapping/release/
+          if-no-files-found: warn
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: app/build/reports/tests/
+
+      - name: Upload APKs for sideloading
+        uses: actions/upload-artifact@v4
+        with:
+          name: apks-${{ github.sha }}
+          path: app/build/outputs/apk/**/*.apk
