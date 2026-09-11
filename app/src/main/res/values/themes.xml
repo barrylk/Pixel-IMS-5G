@@ -4,8 +4,13 @@
       and all colour comes from the Compose Material 3 theme in ui/theme/Theme.kt.
       This platform theme exists only to give the window a sane pre-Compose appearance,
       so it deliberately does not depend on AppCompat or MaterialComponents.
+
+      Theme.DeviceDefault.DayNight has no .NoActionBar variant, so the action bar is
+      switched off with explicit items instead.
     -->
-    <style name="Theme.EnableVoLTE" parent="android:Theme.DeviceDefault.DayNight.NoActionBar">
+    <style name="Theme.EnableVoLTE" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">?android:attr/colorBackground</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
