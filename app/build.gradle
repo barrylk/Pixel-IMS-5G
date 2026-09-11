@@ -88,4 +88,10 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-tooling'
 
     testImplementation 'junit:junit:4.13.2'
+    // Unit tests run on the JVM against AGP's mockable android.jar, which is
+    // derived from the patched AOSP jar this project builds against and yields
+    // classes the JVM rejects with ClassFormatError. The stub jar supplies
+    // well-formed replacements at test runtime. It stays compileOnly for the
+    // app itself, so nothing here reaches the APK.
+    testImplementation 'com.anggrayudi:android-hidden-api:35.0'
 }
