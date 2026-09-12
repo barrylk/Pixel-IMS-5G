@@ -4,12 +4,31 @@ An experimental root- or Shizuku-powered IMS and radio configuration app for Goo
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current public release: `1.0.7` (`v1.0.7`). This is a **small bug-fix update** focused on
-keeping Root SIM Config choices stable across changes and reboots. The one-time uninstall/reinstall notice applies specifically
+Current public release: `1.0.8` (`v1.0.8`). This is a **bug-fix and reliability update** focused on
+the SIM Config page: every switch now confirms its change with the device instead of assuming it worked. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
 ## Changelog
+
+### [1.0.8](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.8) - honest SIM Config controls
+
+- **Switches tell the truth.** Every SIM Config control now writes, reads the value back, and only
+  then settles. A setting the modem refuses reports why, instead of quietly moving to the position
+  you asked for. This is the same class of problem as the `1.0.6` fix, one layer up.
+- **No more freezing on toggle.** Privileged writes no longer run on the interface thread. Toggling
+  a setting cannot hang the app or trip an ANR while the root or Shizuku call is out.
+- **Settings survive rotation.** The page state moved into a `ViewModel`, so rotating the phone or
+  switching light/dark no longer throws away the page — or a change still being applied.
+- **Tidier page.** Controls are grouped into Network, Calling, and Status bar sections rather than one
+  undifferentiated scroll, and each shows an *Applying…* state while its write is in flight.
+- **Faster load.** The page reads the carrier configuration once instead of roughly thirty times, and
+  the reflection scan over every `CarrierConfigManager` field is gone — its result was never used.
+- The privileged operations that pause mid-sequence (easy mode, root force, Google-defaults restore,
+  the Shizuku regional patch, Tensor CA, undo) are now `suspend`, so the compiler enforces that they
+  stay off the main thread rather than each caller having to remember.
+- **Please re-check your settings after updating.** Every SIM Config control was rewritten here. Open
+  SIM Config once and confirm your VoLTE, VoNR, and band choices still read correctly.
 
 ### [1.0.7](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.7) - internal cleanup
 
