@@ -66,6 +66,9 @@ dependencies {
     implementation 'androidx.activity:activity-compose:1.11.0'
     implementation 'androidx.work:work-runtime-ktx:2.10.1'
     implementation 'androidx.navigation:navigation-compose:2.9.5'
+    // Config page state is held in a ViewModel so an in-flight privileged write
+    // survives rotation and theme changes instead of dying with the composable.
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4'
 
     implementation 'androidx.compose.runtime:runtime'
     implementation 'androidx.compose.ui:ui'

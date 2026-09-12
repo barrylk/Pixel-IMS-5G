@@ -1775,6 +1775,21 @@ class SubscriptionModer(
         }
     }
 
+    /**
+     * Reads the whole carrier config in a single binder round trip.
+     *
+     * Each getXValue above fetches the bundle again, so drawing a page of
+     * thirty controls costs thirty IPCs. Callers that need more than one value
+     * should read the bundle once through here and pull keys out of it.
+     */
+    fun readConfigSnapshot(): PersistableBundle? {
+        val subscriptionId = this.subscriptionId
+        if (subscriptionId < 0) {
+            return null
+        }
+        return this.getConfigForSubId(this.loadCachedInterface { carrierConfigLoader }, subscriptionId)
+    }
+
     val simSlotIndex: Int
         get() = this.loadCachedInterface { sub }.getSlotIndex(subscriptionId)
 
