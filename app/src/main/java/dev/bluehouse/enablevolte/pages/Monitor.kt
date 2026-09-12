@@ -41,6 +41,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.bluehouse.enablevolte.components.statusToneColor
+import dev.bluehouse.enablevolte.components.StatusTone
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.SriLankaCarrierProfiles
 import dev.bluehouse.enablevolte.SubscriptionModer
@@ -185,7 +187,7 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
                             Text(
                                 "${if (cell.registered) "Serving" else "Neighbor"} ${cell.type} ${cell.band}",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = if (cell.registered) Color(0xFF21A366) else MaterialTheme.colorScheme.onSurface,
+                                color = if (cell.registered) statusToneColor(StatusTone.SUCCESS) else MaterialTheme.colorScheme.onSurface,
                             )
                             Text("#${index + 1}")
                         }
@@ -253,7 +255,7 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
 @Composable
 private fun StatusPill(label: String, icon: ImageVector) {
     Surface(
-        color = Color(0xFF198754),
+        color = statusToneColor(StatusTone.SUCCESS),
         contentColor = Color.White,
         shape = MaterialTheme.shapes.extraLarge,
     ) {

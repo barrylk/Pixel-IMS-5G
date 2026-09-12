@@ -308,7 +308,7 @@ private fun RootVoWifiPanel(
 ) {
     val status = ui.rootVoWifi
     Panel(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(18.dp)) {
+        Column(Modifier.padding(16.dp)) {
             Text(
                 text = if (status?.isVoWifiActive == true) {
                     stringResource(R.string.root_vowifi_active)

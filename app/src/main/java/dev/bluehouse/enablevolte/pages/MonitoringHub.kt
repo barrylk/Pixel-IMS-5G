@@ -39,11 +39,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
+import dev.bluehouse.enablevolte.ui.theme.NumericSmallTextStyle
+import dev.bluehouse.enablevolte.components.statusToneColor
 import dev.bluehouse.enablevolte.MobileRadioIsolation
 import dev.bluehouse.enablevolte.MobileRadioIsolationSession
 import dev.bluehouse.enablevolte.PrivilegeManager
@@ -239,7 +240,7 @@ private fun PhysicalChannelsPage() {
                             else -> "Channel"
                         }
                         Text("$role ${index + 1}", style = MaterialTheme.typography.titleMedium)
-                        Text(line, style = MaterialTheme.typography.bodySmall)
+                        Text(line, style = NumericSmallTextStyle)
                     }
                 }
             }
@@ -436,7 +437,7 @@ private fun AttachTracePage(subscriptions: List<SubscriptionInfo>) {
                     TraceStep("NR neighbor exposed by Android", current.nrBands.isNotEmpty())
                     TraceStep("NSA secondary-cell group connected", nsaConnected)
                     Text("Current diagnosis", style = MaterialTheme.typography.titleSmall)
-                    Text(reason, color = if (nsaConnected) Color(0xFF21A366) else MaterialTheme.colorScheme.error)
+                    Text(reason, color = if (nsaConnected) statusToneColor(StatusTone.SUCCESS) else MaterialTheme.colorScheme.error)
                     Text(
                         "Android does not expose the RRC SCG request/reject cause through public APIs. " +
                             "A network rejection is only reported when root radio evidence contains one.",
@@ -470,7 +471,7 @@ private fun AttachTracePage(subscriptions: List<SubscriptionInfo>) {
                     ) {
                         Text(if (rootCaptureRunning) "Capturing…" else "Capture sanitized root evidence")
                     }
-                    rootEvidence?.let { Text(it.take(12_000), style = MaterialTheme.typography.bodySmall) }
+                    rootEvidence?.let { Text(it.take(12_000), style = NumericSmallTextStyle) }
                 } else {
                     Text(
                         "Not available in Shizuku mode. Switch the app to Root mode to read sanitized " +
@@ -484,7 +485,7 @@ private fun AttachTracePage(subscriptions: List<SubscriptionInfo>) {
             Panel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("TelephonyRegistry event log", style = MaterialTheme.typography.titleMedium)
-                    events.forEach { Text("${it.time}  ${it.text}", style = MaterialTheme.typography.bodySmall) }
+                    events.forEach { Text("${it.time}  ${it.text}", style = NumericSmallTextStyle) }
                 }
             }
         }
@@ -514,20 +515,28 @@ private fun attachReason(
 private fun TraceStep(label: String, passed: Boolean) {
     Text(
         "${if (passed) "✓" else "✕"}  $label",
-        color = if (passed) Color(0xFF21A366) else MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (passed) statusToneColor(StatusTone.SUCCESS) else statusToneColor(StatusTone.DANGER),
     )
 }
 
+/**
+ * A label and the state the framework reports for it.
+ *
+ * The value is monospaced: these are readings, and a column of them should line
+ * up rather than drift as each one changes length.
+ */
 @Composable
 private fun DiagnosticRow(label: String, value: String, good: Boolean?) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, modifier = Modifier.weight(0.42f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(0.42f))
         Text(
             value,
+            style = NumericSmallTextStyle,
             modifier = Modifier.weight(0.58f),
             color = when (good) {
-                true -> Color(0xFF21A366)
-                false -> MaterialTheme.colorScheme.error
+                true -> statusToneColor(StatusTone.SUCCESS)
+                false -> statusToneColor(StatusTone.DANGER)
                 null -> MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
