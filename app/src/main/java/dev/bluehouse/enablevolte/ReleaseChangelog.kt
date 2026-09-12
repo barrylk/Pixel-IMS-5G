@@ -21,6 +21,28 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "1.0.7" ->
+                InstalledChangelog(
+                    version = "1.0.7",
+                    items =
+                        listOf(
+                            ChangelogItem(
+                                title = "Much smaller download",
+                                detail = "Code shrinking is now enabled and fourteen unused libraries have been removed, cutting the release package from about 54 MB to roughly 3 MB.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                            ChangelogItem(
+                                title = "No feature changes",
+                                detail = "This release is internal housekeeping only. Root and Shizuku behaviour, band selection, the modem patch, and field test are all unchanged.",
+                                tone = ChangelogTone.IMPORTANT,
+                            ),
+                            ChangelogItem(
+                                title = "Automated build checks",
+                                detail = "Every change is now compiled and unit tested automatically before release, so build regressions are caught earlier.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                        ),
+                )
             "1.0.6" ->
                 InstalledChangelog(
                     version = "1.0.6",

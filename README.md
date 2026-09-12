@@ -4,12 +4,19 @@ An experimental root- or Shizuku-powered IMS and radio configuration app for Goo
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current public release: `1.0.6` (`v1.0.6`). This is a **small bug-fix update** focused on
+Current public release: `1.0.7` (`v1.0.7`). This is a **small bug-fix update** focused on
 keeping Root SIM Config choices stable across changes and reboots. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
 ## Changelog
+
+### [1.0.7](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.7) - internal cleanup
+
+- **Much smaller download.** Code shrinking (R8) and resource shrinking are now enabled, and fourteen unused libraries have been removed. The release package drops from about 54 MB to roughly 3 MB.
+- **No feature changes.** Root and Shizuku behaviour, band selection, the regional modem patch, and field test are all unchanged. Nothing about the 5G workflow is different.
+- **Automated build checks.** Every push is now compiled, linted, and unit tested on GitHub before a release can be cut.
+- One test-only dependency was added so unit tests keep a real `org.json` implementation on the JVM.
 
 ### [1.0.6](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.6) - small bug fixes
 

@@ -13,9 +13,6 @@ import androidx.navigation.NavDeepLink
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.get
-import com.github.kittinunf.fuel.httpGet
-import com.github.kittinunf.fuel.json.responseJson
-import com.github.kittinunf.result.Result
 import rikka.shizuku.Shizuku
 
 enum class ShizukuStatus {
@@ -40,32 +37,6 @@ fun checkShizukuPermission(code: Int): ShizukuStatus =
 
 val SubscriptionInfo.uniqueName: String
     get() = "${this.displayName} (SIM ${this.simSlotIndex + 1})"
-
-fun getLatestAppVersion(handler: (String) -> Unit) {
-    "https://api.github.com/repos/kyujin-cho/pixel-volte-patch/releases"
-        .httpGet()
-        .header("X-GitHub-Api-Version", "2022-11-28")
-        .responseJson { _, _, result ->
-            when (result) {
-                is Result.Failure -> {
-                    handler("0.0.0")
-                }
-                is Result.Success -> {
-                    try {
-                        handler(
-                            result
-                                .get()
-                                .array()
-                                .getJSONObject(0)
-                                .getString("tag_name"),
-                        )
-                    } catch (e: java.lang.Exception) {
-                        handler("0.0.0")
-                    }
-                }
-            }
-        }
-}
 
 fun NavGraphBuilder.composable(
     route: String,
