@@ -4,12 +4,33 @@ An experimental root- or Shizuku-powered IMS and radio configuration app for Goo
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current public release: `1.0.8` (`v1.0.8`). This is a **bug-fix and reliability update** focused on
-the SIM Config page: every switch now confirms its change with the device instead of assuming it worked. The one-time uninstall/reinstall notice applies specifically
+Current public release: `1.0.9` (`v1.0.9`). This is a **complete visual redesign** — the app moves from a
+violet glass theme to a neutral instrument palette, with monospaced measurements and grouped, uncluttered pages. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
 ## Changelog
+
+### [1.0.9](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.9) - new interface
+
+- **A completely new look.** The violet/blue/cyan glassmorphism is gone: no gradient backdrop, no
+  colour blobs behind the content, no translucent cards. The app now uses a neutral instrument
+  palette — grey carries the structure, one blue is the accent, and colour is spent only on signal
+  state, so a green reading means something.
+- **Readings are monospaced.** Band numbers, physical-channel captures, diagnostic values, the
+  TelephonyRegistry event log and root evidence use a fixed-width face, so digits keep their columns
+  as a live measurement updates.
+- **Organised, not cluttered.** Property rows no longer each draw their own floating card. Related
+  controls are grouped into panels with hairline dividers — SIM Config is now Network, Calling,
+  Status bar, quick tiles and miscellaneous rather than one undifferentiated scroll.
+- **Navigation bar redesigned.** The floating 28dp rounded pill with its shadow and spring-animated
+  icons is now a flush bar with a hairline above it, with selection shown by colour alone.
+- **Better light mode.** Signal colours are tuned per theme instead of one value serving both, and
+  four hard-coded greens that were never in the palette are gone.
+- **Pages open faster.** The page-header entrance animation is removed; it delayed the first reading
+  by roughly 400 ms on every page open.
+- Corner radii top out at 16dp, where the old scale began. Dynamic colour is deliberately not offered:
+  the palette carries meaning, and wallpaper-derived hues would decide the signal colours.
 
 ### [1.0.8](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.8) - honest SIM Config controls
 
