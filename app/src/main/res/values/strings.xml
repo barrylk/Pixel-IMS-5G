@@ -90,6 +90,27 @@
     <string name="default_">Default</string>
     <string name="manually_set_config">Manually set config</string>
     <string name="cannot_find_key">Cannot find specified key</string>
+
+    <!-- Live network monitor -->
+    <string name="network_waiting">Waiting for the radio…</string>
+    <string name="network_live">Live</string>
+    <string name="network_paused">Paused</string>
+    <string name="network_serving">Serving</string>
+    <string name="network_anchor">LTE anchor %1$s · %2$s · PCI %3$s</string>
+    <string name="network_history">Signal history</string>
+    <string name="network_samples">%1$s samples</string>
+    <string name="network_cells">Cells in view (%1$s)</string>
+    <string name="network_log">Cell log</string>
+    <string name="network_clear">Clear</string>
+    <string name="network_log_empty">Nothing yet. Handovers, band changes and EN-DC transitions will appear here as they happen.</string>
+    <string name="network_log_note">The log is kept in memory for this session only.</string>
+    <string name="param_channel">Channel</string>
+    <string name="param_bandwidth">Bandwidth</string>
+    <string name="param_timing_advance">Timing advance</string>
+    <string name="param_cell_id">Cell ID</string>
+    <string name="network">Network</string>
+    <string name="network_diagnostics">Deep diagnostics</string>
+    <string name="network_diagnostics_summary">Attach trace, physical channels, registry events and the CarrierConfig diff.</string>
     <!-- Shown while a privileged write is in flight and before the read-back confirms it. -->
     <string name="control_applying">Applying…</string>
     <string name="control_rejected">The device did not accept this change.</string>

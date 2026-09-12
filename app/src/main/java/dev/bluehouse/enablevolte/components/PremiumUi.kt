@@ -1,7 +1,6 @@
 package dev.bluehouse.enablevolte.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,13 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 import dev.bluehouse.enablevolte.ui.theme.NumericTextStyle
-import dev.bluehouse.enablevolte.ui.theme.SignalAmber
-import dev.bluehouse.enablevolte.ui.theme.SignalAmberDark
-import dev.bluehouse.enablevolte.ui.theme.SignalGreen
-import dev.bluehouse.enablevolte.ui.theme.SignalGreenDark
-import dev.bluehouse.enablevolte.ui.theme.SignalRed
-import dev.bluehouse.enablevolte.ui.theme.SignalRedDark
 
 enum class StatusTone {
     ACCENT,
@@ -50,12 +44,12 @@ enum class StatusTone {
  */
 @Composable
 fun statusToneColor(tone: StatusTone): Color {
-    val dark = isSystemInDarkTheme()
+    val inst = LocalInstrument.current
     return when (tone) {
         StatusTone.ACCENT -> MaterialTheme.colorScheme.primary
-        StatusTone.SUCCESS -> if (dark) SignalGreen else SignalGreenDark
-        StatusTone.WARNING -> if (dark) SignalAmber else SignalAmberDark
-        StatusTone.DANGER -> if (dark) SignalRed else SignalRedDark
+        StatusTone.SUCCESS -> inst.good
+        StatusTone.WARNING -> inst.fair
+        StatusTone.DANGER -> inst.poor
         StatusTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 }

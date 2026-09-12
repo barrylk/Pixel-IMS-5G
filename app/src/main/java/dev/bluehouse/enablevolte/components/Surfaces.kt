@@ -15,24 +15,40 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-
-/** Panels are rectangular with a small radius; see InstrumentShapes. */
-val PanelShape
-    @Composable get() = MaterialTheme.shapes.medium
+import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 
 /**
- * The page ground.
+ * The page ground, lit from above.
  *
- * A flat, single colour. The previous backdrop layered a vertical gradient and
- * two large radial colour blobs behind every screen, which tinted the
- * measurements sitting on top of it and made panels hard to tell apart from
- * their background.
+ * Panels in 2.0 are translucent, and translucency is only legible over
+ * something. A flat fill made the original glass read as haze; a ground with a
+ * light source in it gives every panel an edge to catch.
  */
 @Composable
 fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Box(modifier = Modifier.fillMaxSize().background(colors.background)) {
+    val inst = LocalInstrument.current
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .background(
+                Brush.verticalGradient(
+                    0.0f to inst.glow.copy(alpha = if (inst.isDark) 0.13f else 0.07f),
+                    0.32f to colors.background.copy(alpha = 0.0f),
+                    1.0f to Color.Transparent,
+                ),
+            )
+            .background(
+                Brush.verticalGradient(
+                    0.55f to Color.Transparent,
+                    1.0f to inst.ember.copy(alpha = if (inst.isDark) 0.05f else 0.03f),
+                ),
+            ),
+    ) {
         CompositionLocalProvider(LocalContentColor provides colors.onBackground) {
             content()
         }
@@ -40,11 +56,11 @@ fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
 }
 
 /**
- * A grouped panel.
+ * A frosted panel.
  *
- * Solid fill and a hairline outline, no translucency and no gradient, so a
- * panel is legible against the page at any scroll position and its contents
- * keep their intended colour.
+ * The fill is a diagonal gradient rather than a flat colour so the surface has
+ * a direction to it, and the hairline is brighter than the fill so the edge
+ * reads before the body does — that edge is what separates glass from fog.
  */
 @Composable
 fun Panel(
@@ -52,40 +68,45 @@ fun Panel(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    val inst = LocalInstrument.current
     val colors = MaterialTheme.colorScheme
-    val shape = MaterialTheme.shapes.medium
+    val shape = MaterialTheme.shapes.large
+    val fill = Brush.linearGradient(listOf(inst.frostHigh, inst.frost, inst.frost.copy(alpha = inst.frost.alpha * 0.55f)))
+    val border = BorderStroke(1.dp, inst.edge)
+
     if (onClick == null) {
         Surface(
             modifier = modifier,
             shape = shape,
-            color = colors.surfaceContainer,
+            color = Color.Transparent,
             contentColor = colors.onSurface,
-            border = BorderStroke(1.dp, colors.outlineVariant),
+            border = border,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
-            content = content,
-        )
+        ) {
+            Box(Modifier.background(fill, shape)) { content() }
+        }
     } else {
         Surface(
             onClick = onClick,
             modifier = modifier,
             shape = shape,
-            color = colors.surfaceContainer,
+            color = Color.Transparent,
             contentColor = colors.onSurface,
-            border = BorderStroke(1.dp, colors.outlineVariant),
+            border = border,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
-            content = content,
-        )
+        ) {
+            Box(Modifier.background(fill, shape)) { content() }
+        }
     }
 }
 
 /**
- * A run of related rows inside one panel, separated by hairlines.
+ * A run of related rows in one panel.
  *
- * Grouping is what removes the clutter: a page of twenty individually floating
- * cards reads as twenty unrelated things, where four panels of five rows reads
- * as four decisions.
+ * Grouping is what keeps a settings page from reading as twenty unrelated
+ * floating things.
  */
 @Composable
 fun PanelGroup(
@@ -103,6 +124,6 @@ fun RowDivider(inset: Boolean = true) {
     HorizontalDivider(
         modifier = Modifier.padding(start = if (inset) 16.dp else 0.dp),
         thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant,
+        color = LocalInstrument.current.edge,
     )
 }
