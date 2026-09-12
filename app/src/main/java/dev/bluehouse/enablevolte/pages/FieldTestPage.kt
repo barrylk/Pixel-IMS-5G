@@ -226,7 +226,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
         }
 
         Panel(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -270,7 +270,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
         }
 
         Panel(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -342,7 +342,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
         }
         result?.let { report ->
             Panel(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     PremiumStatusChip(stringResource(R.string.field_test_complete), StatusTone.SUCCESS)
                     Text(
                         stringResource(R.string.field_test_saved, report.fileName),

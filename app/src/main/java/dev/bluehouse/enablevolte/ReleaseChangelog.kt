@@ -21,6 +21,43 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "1.0.9" ->
+                InstalledChangelog(
+                    version = "1.0.9",
+                    items =
+                        listOf(
+                            ChangelogItem(
+                                title = "A completely new look",
+                                detail = "The violet and cyan glass theme is gone. The app now uses a neutral instrument palette: grey structure, one blue accent, and colour reserved for signal state so a green reading actually means something.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Readings are monospaced",
+                                detail = "Band numbers, NRARFCN, PCI, signal measurements, and the event log now use a fixed-width face, so digits stay in their columns instead of shifting sideways as a live reading updates.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                            ChangelogItem(
+                                title = "Organised, not cluttered",
+                                detail = "Settings rows no longer each float in their own card. Related controls are grouped into panels with dividers, so SIM Config reads as four decisions rather than twenty loose switches.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                            ChangelogItem(
+                                title = "Navigation bar redesigned",
+                                detail = "The floating rounded pill is now a flush bar with a hairline above it, and the bouncing icon animation is gone.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                            ChangelogItem(
+                                title = "Better light mode",
+                                detail = "Signal colours are tuned separately for light and dark instead of sharing one value, so nothing is washed out on a white background.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "Pages open faster",
+                                detail = "The entrance animation on every page header has been removed. It delayed the first reading by about four tenths of a second each time you opened a page.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                        ),
+                )
             "1.0.8" ->
                 InstalledChangelog(
                     version = "1.0.8",

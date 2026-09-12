@@ -34,12 +34,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import dev.bluehouse.enablevolte.ui.theme.NumericSmallTextStyle
+import dev.bluehouse.enablevolte.components.statusToneColor
+import dev.bluehouse.enablevolte.components.StatusTone
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.PrivilegeMode
@@ -113,21 +115,25 @@ private fun BandPicker(
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         choices.forEach { band ->
             val hasSignal = band in detected
+            val signalTone = statusToneColor(StatusTone.SUCCESS)
             FilterChip(
                 selected = band in selected,
                 enabled = enabled,
                 onClick = { onToggle(band) },
-                label = { Text("$prefix$band") },
+                // Band numbers are measurements, so they are set in the numeric face
+                // and a band the phone is actually seeing is marked with the signal
+                // tone rather than a hard-coded green block.
+                label = { Text("$prefix$band", style = NumericSmallTextStyle) },
                 leadingIcon = if (band in selected) {
                     { Icon(Icons.Filled.Check, contentDescription = null) }
                 } else null,
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = if (hasSignal) Color(0xFF198754) else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    labelColor = if (hasSignal) Color.White else MaterialTheme.colorScheme.onSurface,
-                    selectedContainerColor = if (hasSignal) Color(0xFF198754) else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    selectedLabelColor = if (hasSignal) Color.White else MaterialTheme.colorScheme.onSurface,
-                    disabledContainerColor = if (hasSignal) Color(0xFF198754).copy(alpha = 0.38f) else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.38f),
-                    disabledLabelColor = if (hasSignal) Color.White.copy(alpha = 0.65f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    containerColor = if (hasSignal) signalTone.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    labelColor = if (hasSignal) signalTone else MaterialTheme.colorScheme.onSurface,
+                    selectedContainerColor = if (hasSignal) signalTone.copy(alpha = 0.24f) else MaterialTheme.colorScheme.surfaceContainerHighest,
+                    selectedLabelColor = if (hasSignal) signalTone else MaterialTheme.colorScheme.onSurface,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.38f),
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 ),
             )
         }
@@ -515,7 +521,7 @@ fun Bands(
                         ),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (report.active) Color(0xFF198754) else MaterialTheme.colorScheme.onSurface,
+                        color = if (report.active) statusToneColor(StatusTone.SUCCESS) else MaterialTheme.colorScheme.onSurface,
                     )
                     report.gates.forEach { gate ->
                         val value = when {
