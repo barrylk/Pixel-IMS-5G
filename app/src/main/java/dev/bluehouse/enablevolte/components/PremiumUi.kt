@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -215,8 +216,12 @@ fun PremiumSectionLabel(
 /**
  * The container for a single property row.
  *
- * Flat and opaque. Rows placed consecutively inside a [PanelGroup] read as one
- * grouped list; used on their own they still sit clearly on the page.
+ * Transparent rather than a card. Every one of these used to draw its own
+ * rounded translucent surface, so a settings page was twenty floating cards
+ * with twenty shadows — which is most of what made the pages feel cluttered.
+ * A row now takes the colour of whatever it sits in: grouped into a
+ * [PanelGroup] it reads as one list, and directly on the page it reads as a
+ * plain settings row.
  */
 @Composable
 fun CompactPropertySurface(
@@ -224,13 +229,12 @@ fun CompactPropertySurface(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val color = MaterialTheme.colorScheme.surfaceContainer
     if (onClick == null) {
         Surface(
             modifier = modifier,
             shape = MaterialTheme.shapes.medium,
-            color = color,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            color = Color.Transparent,
+            contentColor = LocalContentColor.current,
             tonalElevation = 0.dp,
             content = content,
         )
@@ -239,8 +243,8 @@ fun CompactPropertySurface(
             onClick = onClick,
             modifier = modifier,
             shape = MaterialTheme.shapes.medium,
-            color = color,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            color = Color.Transparent,
+            contentColor = LocalContentColor.current,
             tonalElevation = 0.dp,
             content = content,
         )
