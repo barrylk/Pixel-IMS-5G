@@ -2,9 +2,9 @@ package dev.bluehouse.enablevolte.pages
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -25,12 +25,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.R
-import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.HeaderText
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
-import dev.bluehouse.enablevolte.ui.theme.Signal
 import dev.bluehouse.enablevolte.ui.theme.Fair
 import dev.bluehouse.enablevolte.ui.theme.Good
+import dev.bluehouse.enablevolte.ui.theme.Signal
 
 @Suppress("ktlint:standard:function-naming")
 @Composable

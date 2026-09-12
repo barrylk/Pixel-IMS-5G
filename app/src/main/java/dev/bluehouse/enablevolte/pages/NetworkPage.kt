@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Biotech
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,8 +44,6 @@ import dev.bluehouse.enablevolte.NetworkMonitorViewModel
 import dev.bluehouse.enablevolte.NetworkState
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.SubscriptionModer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Biotech
 import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PanelGroup
 import dev.bluehouse.enablevolte.components.PremiumActionRow
