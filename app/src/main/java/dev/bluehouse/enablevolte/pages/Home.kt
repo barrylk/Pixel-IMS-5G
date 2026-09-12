@@ -36,6 +36,7 @@ import dev.bluehouse.enablevolte.ShizukuStatus
 import dev.bluehouse.enablevolte.SubscriptionModer
 import dev.bluehouse.enablevolte.checkShizukuPermission
 import dev.bluehouse.enablevolte.components.Panel
+import dev.bluehouse.enablevolte.components.PanelGroup
 import dev.bluehouse.enablevolte.components.PremiumActionRow
 import dev.bluehouse.enablevolte.components.PremiumMetric
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
@@ -116,7 +117,7 @@ fun Home(navController: NavController) {
     }
 
     Column(
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).verticalScroll(scrollState),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         PremiumPageIntro(
@@ -128,7 +129,7 @@ fun Home(navController: NavController) {
         PremiumSectionLabel(stringResource(R.string.premium_system_readiness))
         Panel(Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(18.dp),
+                modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -197,12 +198,14 @@ fun Home(navController: NavController) {
         }
 
         PremiumSectionLabel(stringResource(R.string.premium_quick_start))
-        PremiumActionRow(
-            title = stringResource(R.string.open_how_to_use),
-            subtitle = stringResource(R.string.how_to_use_summary),
-            icon = Icons.Filled.MenuBook,
-            onClick = { navController.navigate("home/how-to") },
-        )
+        PanelGroup {
+            PremiumActionRow(
+                title = stringResource(R.string.open_how_to_use),
+                subtitle = stringResource(R.string.how_to_use_summary),
+                icon = Icons.Filled.MenuBook,
+                onClick = { navController.navigate("home/how-to") },
+            )
+        }
 
         for (idx in subscriptions.indices) {
             val subscription = subscriptions[idx]
@@ -223,7 +226,7 @@ fun Home(navController: NavController) {
                 null
             }
             Panel(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(subscription.uniqueName, style = MaterialTheme.typography.titleLarge)
