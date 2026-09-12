@@ -88,10 +88,10 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-tooling'
 
     testImplementation 'junit:junit:4.13.2'
-    // Unit tests run on the JVM against AGP's mockable android.jar, which is
-    // derived from the patched AOSP jar this project builds against and yields
-    // classes the JVM rejects with ClassFormatError. The stub jar supplies
-    // well-formed replacements at test runtime. It stays compileOnly for the
-    // app itself, so nothing here reaches the APK.
-    testImplementation 'com.anggrayudi:android-hidden-api:35.0'
+    // RootVoWifiStatus and RegionalModemPatchStatus parse with org.json, which
+    // Android provides at runtime but the JVM does not. This used to arrive
+    // transitively through fuel-json; AGP's mockable android.jar supplies a
+    // stub the JVM rejects with ClassFormatError, so depend on the real
+    // implementation explicitly for tests. Not needed by the app or the APK.
+    testImplementation 'org.json:json:20240303'
 }
