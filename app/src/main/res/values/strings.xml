@@ -90,6 +90,12 @@
     <string name="default_">Default</string>
     <string name="manually_set_config">Manually set config</string>
     <string name="cannot_find_key">Cannot find specified key</string>
+    <!-- Shown while a privileged write is in flight and before the read-back confirms it. -->
+    <string name="control_applying">Applying…</string>
+    <string name="control_rejected">The device did not accept this change.</string>
+    <string name="config_section_network">Network</string>
+    <string name="config_section_calling">Calling</string>
+    <string name="config_section_indicators">Status bar and icons</string>
     <string name="dump_config">Dump Config</string>
     <string name="property_name">Property Name</string>
     <string name="property_type">Property Type</string>

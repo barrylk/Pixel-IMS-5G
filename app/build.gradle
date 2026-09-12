@@ -13,8 +13,8 @@ android {
         // Every Tensor Pixel (Pixel 6 and newer) launched on Android 12 / API 31 or later.
         minSdk 31
         targetSdk 36
-        versionCode 27
-        versionName "1.0.7"
+        versionCode 28
+        versionName "1.0.8"
 
         vectorDrawables {
             useSupportLibrary true
@@ -66,6 +66,9 @@ dependencies {
     implementation 'androidx.activity:activity-compose:1.11.0'
     implementation 'androidx.work:work-runtime-ktx:2.10.1'
     implementation 'androidx.navigation:navigation-compose:2.9.5'
+    // Config page state is held in a ViewModel so an in-flight privileged write
+    // survives rotation and theme changes instead of dying with the composable.
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4'
 
     implementation 'androidx.compose.runtime:runtime'
     implementation 'androidx.compose.ui:ui'

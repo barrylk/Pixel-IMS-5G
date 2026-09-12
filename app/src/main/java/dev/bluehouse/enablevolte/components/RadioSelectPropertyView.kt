@@ -90,11 +90,20 @@ fun RadioSelectPropertyUpdateDialog(
     }
 }
 
+/**
+ * A list of mutually exclusive values for one privileged setting.
+ *
+ * [busy] and [error] mirror [BooleanPropertyView]: the value line reports that
+ * a change is in flight, or why the device refused it, rather than showing a
+ * selection that was never accepted.
+ */
 @Composable
 fun RadioSelectPropertyView(
     label: String,
     values: Array<String>,
     selectedIndex: Int?,
+    busy: Boolean = false,
+    error: String? = null,
     onUpdate: ((Int) -> Unit)? = null,
 ) {
     var openDialog by rememberSaveable { mutableStateOf(false) }
@@ -110,8 +119,16 @@ fun RadioSelectPropertyView(
             )
         }
     }
-    ClickablePropertyView(label = label, value = if (selectedIndex != null) values[selectedIndex] else "") {
-        openDialog = true
+    val shown = when {
+        busy -> stringResource(R.string.control_applying)
+        error != null -> error
+        selectedIndex != null -> values[selectedIndex]
+        else -> ""
+    }
+    ClickablePropertyView(label = label, value = shown) {
+        if (!busy) {
+            openDialog = true
+        }
     }
 }
 

@@ -21,6 +21,43 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "1.0.8" ->
+                InstalledChangelog(
+                    version = "1.0.8",
+                    items =
+                        listOf(
+                            ChangelogItem(
+                                title = "Switches tell the truth",
+                                detail = "Every SIM Config switch now waits for the device to confirm the change and reads the value back. A setting the modem refuses reports why instead of quietly showing itself as on.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "No more freezing on toggle",
+                                detail = "Applying a setting no longer runs on the interface thread, so the app stays responsive and cannot hang while a root or Shizuku write is in progress.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "Settings survive rotation",
+                                detail = "Rotating the phone or switching between light and dark no longer discards the SIM Config page or interrupts a change that is still being applied.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "Tidier SIM Config page",
+                                detail = "Controls are grouped into Network, Calling, and Status bar sections instead of one long list, and each one shows when it is applying.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                            ChangelogItem(
+                                title = "Faster page load",
+                                detail = "The page reads the carrier configuration once rather than around thirty times, and no longer scans every configuration field it never used.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                            ChangelogItem(
+                                title = "Please re-check your settings",
+                                detail = "Every SIM Config control was rewritten in this release. Open SIM Config once after updating and confirm your VoLTE, VoNR, and band choices still read correctly.",
+                                tone = ChangelogTone.IMPORTANT,
+                            ),
+                        ),
+                )
             "1.0.7" ->
                 InstalledChangelog(
                     version = "1.0.7",

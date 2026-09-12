@@ -1,14 +1,13 @@
 package dev.bluehouse.enablevolte.pages
 
+import android.app.Application
 import android.app.StatusBarManager
 import android.content.ComponentName
 import android.graphics.drawable.Icon
 import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
-import android.telephony.CarrierConfigManager
-import android.util.Log
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,45 +15,58 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.Composable
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import dev.bluehouse.enablevolte.CarrierModer
-import dev.bluehouse.enablevolte.R
+import dev.bluehouse.enablevolte.BooleanControl
+import dev.bluehouse.enablevolte.ConfigControls
+import dev.bluehouse.enablevolte.ConfigUiState
+import dev.bluehouse.enablevolte.ConfigViewModel
 import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.PrivilegeMode
-import dev.bluehouse.enablevolte.RootVoWifiStatus
-import dev.bluehouse.enablevolte.ShizukuStatus
-import dev.bluehouse.enablevolte.SubscriptionModer
-import dev.bluehouse.enablevolte.checkShizukuPermission
+import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.components.BooleanPropertyView
 import dev.bluehouse.enablevolte.components.ClickablePropertyView
-import dev.bluehouse.enablevolte.components.HeaderText
 import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.HeaderText
 import dev.bluehouse.enablevolte.components.InfiniteLoadingDialog
 import dev.bluehouse.enablevolte.components.RadioSelectPropertyView
 import dev.bluehouse.enablevolte.components.UserAgentPropertyView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.lang.IllegalStateException
+
+/**
+ * One toggle, wired to the control state the view model holds for it.
+ *
+ * Controls the running Android version cannot support are not loaded, so an
+ * absent entry means "not applicable here" and the row is simply not drawn.
+ */
+@Composable
+private fun BooleanControlView(
+    label: String,
+    control: BooleanControl,
+    ui: ConfigUiState,
+    onToggle: (BooleanControl, Boolean) -> Unit,
+) {
+    val state = ui.booleans[control.id] ?: return
+    BooleanPropertyView(
+        label = label,
+        toggled = state.value ?: false,
+        minSdk = control.minSdk,
+        busy = state.isBusy,
+        error = if (state.hasFailed) state.message else null,
+    ) { requested -> onToggle(control, requested) }
+}
 
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -62,718 +74,261 @@ fun Config(
     navController: NavController,
     subId: Int,
 ) {
-    val TAG = "HomeActivity:Config"
-
-    val moder = SubscriptionModer(LocalContext.current, subId)
-    val carrierModer = CarrierModer(LocalContext.current)
-    val carrierName = moder.carrierName
-    val scrollState = rememberScrollState()
     val context = LocalContext.current
-    val cannotFindKeyText = stringResource(R.string.cannot_find_key)
-    var configurable by rememberSaveable { mutableStateOf(false) }
-    var voLTEEnabled by rememberSaveable { mutableStateOf(false) }
-    var voNREnabled by rememberSaveable { mutableStateOf(false) }
-    var nrAvailabilityIndex by rememberSaveable { mutableIntStateOf(0) }
-    var radioModeIndex by rememberSaveable { mutableIntStateOf(0) }
-    var crossSIMEnabled by rememberSaveable { mutableStateOf(false) }
-    var voWiFiEnabled by rememberSaveable { mutableStateOf(false) }
-    var voWiFiEnabledWhileRoaming by rememberSaveable { mutableStateOf(false) }
-    var showIMSinSIMInfo by rememberSaveable { mutableStateOf(false) }
-    var allowAddingAPNs by rememberSaveable { mutableStateOf(false) }
-    var showVoWifiMode by rememberSaveable { mutableStateOf(false) }
-    var showVoWifiRoamingMode by rememberSaveable { mutableStateOf(false) }
-    var wfcSpnFormatIndex by rememberSaveable { mutableIntStateOf(0) }
-    var showVoWifiIcon by rememberSaveable { mutableStateOf(false) }
-    var alwaysDataRATIcon by rememberSaveable { mutableStateOf(false) }
-    var supportWfcWifiOnly by rememberSaveable { mutableStateOf(false) }
-    var vtEnabled by rememberSaveable { mutableStateOf(false) }
-    var ssOverUtEnabled by rememberSaveable { mutableStateOf(false) }
-    var ssOverCDMAEnabled by rememberSaveable { mutableStateOf(false) }
-    var show4GForLteEnabled by rememberSaveable { mutableStateOf(false) }
-    var hideEnhancedDataIconEnabled by rememberSaveable { mutableStateOf(false) }
-    var is4GPlusEnabled by rememberSaveable { mutableStateOf(false) }
-    var configuredUserAgent: String? by rememberSaveable { mutableStateOf("") }
-    var configurableItems by rememberSaveable { mutableStateOf<Map<String, String>>(mapOf()) }
-    var reversedConfigurableItems by rememberSaveable { mutableStateOf<Map<String, String>>(mapOf()) }
-    var loading by rememberSaveable { mutableStateOf(true) }
-    var rootVoWifiStatus by remember { mutableStateOf<RootVoWifiStatus?>(null) }
-    var rootVoWifiBusy by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val simSlotIndex = moder.simSlotIndex
+    val viewModel: ConfigViewModel =
+        viewModel(
+            key = "config-$subId",
+            factory = ConfigViewModel.factory(context.applicationContext as Application, subId),
+        )
+    val ui by viewModel.state.collectAsState()
+    val scrollState = rememberScrollState()
+    val carrierName = viewModel.carrierName
+    val onToggle: (BooleanControl, Boolean) -> Unit = { control, requested -> viewModel.toggle(control, requested) }
 
-    fun loadFlags() {
-        Log.d(TAG, "loadFlags")
-        configurableItems =
-            listOf(CarrierConfigManager::class.java, *CarrierConfigManager::class.java.declaredClasses)
-                .map {
-                    it.declaredFields.filter { field ->
-                        field.name != "KEY_PREFIX" && field.name.startsWith("KEY_")
-                    }
-                }.flatten()
-                .associate { field -> field.name to field.get(field) as String }
-        reversedConfigurableItems = configurableItems.entries.associate { (k, v) -> v to k }
-        voLTEEnabled = moder.isVoLteConfigEnabled
-        voNREnabled = VERSION.SDK_INT >= VERSION_CODES.UPSIDE_DOWN_CAKE && moder.isVoNrConfigEnabled
-        nrAvailabilityIndex = moder.nrAvailabilityIndex
-        radioModeIndex = moder.radioModeIndex
-        crossSIMEnabled = moder.isCrossSIMConfigEnabled
-        voWiFiEnabled = moder.isVoWifiConfigEnabled
-        voWiFiEnabledWhileRoaming = moder.isVoWifiWhileRoamingEnabled
-        showIMSinSIMInfo = VERSION.SDK_INT >= VERSION_CODES.R && moder.showIMSinSIMInfo
-        allowAddingAPNs = moder.allowAddingAPNs
-        showVoWifiMode = VERSION.SDK_INT >= VERSION_CODES.R && moder.showVoWifiMode
-        showVoWifiRoamingMode = VERSION.SDK_INT >= VERSION_CODES.R && moder.showVoWifiRoamingMode
-        wfcSpnFormatIndex = moder.wfcSpnFormatIndex
-        showVoWifiIcon = moder.showVoWifiIcon
-        alwaysDataRATIcon = VERSION.SDK_INT >= VERSION_CODES.R && moder.alwaysDataRATIcon
-        supportWfcWifiOnly = moder.supportWfcWifiOnly
-        vtEnabled = moder.isVtConfigEnabled
-        ssOverUtEnabled = moder.ssOverUtEnabled
-        ssOverCDMAEnabled = moder.ssOverCDMAEnabled
-        show4GForLteEnabled = VERSION.SDK_INT >= VERSION_CODES.R && moder.isShow4GForLteEnabled
-        hideEnhancedDataIconEnabled = VERSION.SDK_INT >= VERSION_CODES.R && moder.isHideEnhancedDataIconEnabled
-        is4GPlusEnabled = moder.is4GPlusEnabled
-        configuredUserAgent =
-            try {
-                moder.userAgentConfig
-            } catch (e: java.lang.NullPointerException) {
-                null
-            }
+    if (ui.loading) {
+        InfiniteLoadingDialog()
+        return
     }
 
-    LaunchedEffect(true) {
-        if (
-            (PrivilegeManager.activeMode == PrivilegeMode.ROOT && PrivilegeManager.isRootReady()) ||
-            checkShizukuPermission(0) == ShizukuStatus.GRANTED
-        ) {
-            if (carrierModer.deviceSupportsIMS && subId >= 0) {
-                configurable =
-                    try {
-                        withContext(Dispatchers.Default) {
-                            loadFlags()
-                            loading = false
-                        }
-                        if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
-                            rootVoWifiStatus = withContext(Dispatchers.IO) {
-                                PrivilegeManager.getRootVoWifiStatus(subId)
-                            }
-                        }
-                        true
-                    } catch (e: IllegalStateException) {
-                        loading = false
-                        false
-                    }
-            } else {
-                loading = false
-                configurable = false
+    Column(modifier = Modifier.padding(Dp(16f)).verticalScroll(scrollState)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {}, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.sim_config))
             }
-        } else {
-            loading = false
-            configurable = false
+            OutlinedButton(
+                onClick = { navController.navigate("bands/$subId") },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.bands))
+            }
+        }
+        Text(
+            text = stringResource(
+                if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
+                    R.string.root_sim_config_persistence
+                } else {
+                    R.string.shizuku_sim_config_persistence
+                },
+            ),
+            color = if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+
+        HeaderText(text = stringResource(R.string.config_section_network))
+        RadioSelectPropertyView(
+            label = stringResource(R.string.nr_architecture),
+            values = arrayOf(
+                stringResource(R.string.nr_off),
+                stringResource(R.string.nr_nsa),
+                stringResource(R.string.nr_sa),
+                stringResource(R.string.nr_nsa_sa),
+            ),
+            selectedIndex = ui.nrAvailability.value ?: 0,
+            busy = ui.nrAvailability.isBusy,
+            error = if (ui.nrAvailability.hasFailed) ui.nrAvailability.message else null,
+        ) { viewModel.setNrAvailability(it) }
+
+        RadioSelectPropertyView(
+            label = stringResource(R.string.radio_mode),
+            values = arrayOf(
+                stringResource(R.string.radio_default),
+                stringResource(R.string.radio_5g_preferred),
+                stringResource(R.string.radio_nr_only),
+            ),
+            selectedIndex = ui.radioMode.value ?: 0,
+            busy = ui.radioMode.isBusy,
+            error = if (ui.radioMode.hasFailed) ui.radioMode.message else null,
+        ) { viewModel.setRadioMode(it) }
+
+        ClickablePropertyView(label = stringResource(R.string.radio_warning), value = "")
+        BooleanControlView(stringResource(R.string.enable_enhanced_4g_lte_plus), ConfigControls.FOUR_G_PLUS, ui, onToggle)
+        BooleanControlView(stringResource(R.string.allow_adding_apns), ConfigControls.ALLOW_ADDING_APNS, ui, onToggle)
+
+        HeaderText(text = stringResource(R.string.config_section_calling))
+        BooleanControlView(stringResource(R.string.enable_volte), ConfigControls.VOLTE, ui, onToggle)
+        BooleanControlView(stringResource(R.string.enable_vonr), ConfigControls.VONR, ui, onToggle)
+        BooleanControlView(stringResource(R.string.enable_crosssim), ConfigControls.CROSS_SIM, ui, onToggle)
+        BooleanControlView(stringResource(R.string.enable_vowifi), ConfigControls.VOWIFI, ui, onToggle)
+        BooleanControlView(stringResource(R.string.enable_vowifi_while_roamed), ConfigControls.VOWIFI_ROAMING, ui, onToggle)
+        BooleanControlView(stringResource(R.string.enable_video_calling_vt), ConfigControls.VIDEO_CALLING, ui, onToggle)
+        BooleanControlView(stringResource(R.string.enable_ss_over_ut), ConfigControls.SS_OVER_UT, ui, onToggle)
+        BooleanControlView(stringResource(R.string.enable_ss_over_cdma), ConfigControls.SS_OVER_CDMA, ui, onToggle)
+        BooleanControlView(stringResource(R.string.show_wifi_only_for_vowifi), ConfigControls.WFC_WIFI_ONLY, ui, onToggle)
+        BooleanControlView(stringResource(R.string.show_vowifi_preference_in_settings), ConfigControls.SHOW_VOWIFI_MODE, ui, onToggle)
+        BooleanControlView(
+            stringResource(R.string.show_vowifi_roaming_preference_in_settings),
+            ConfigControls.SHOW_VOWIFI_ROAMING_MODE,
+            ui,
+            onToggle,
+        )
+        UserAgentPropertyView(label = stringResource(R.string.user_agent), value = ui.userAgent.value) {
+            viewModel.setUserAgent(it)
+        }
+        RadioSelectPropertyView(
+            label = stringResource(R.string.wi_fi_calling_carrier_name_format),
+            values = arrayOf(
+                "%s".format(carrierName),
+                "%s Wi-Fi Calling".format(carrierName),
+                "WLAN Call",
+                "%s WLAN Call".format(carrierName),
+                "%s Wi-Fi".format(carrierName),
+                "WiFi Calling | %s".format(carrierName),
+                "%s VoWifi".format(carrierName),
+                "Wi-Fi Calling",
+                "Wi-Fi",
+                "WiFi Calling",
+                "VoWifi",
+                "%s WiFi Calling".format(carrierName),
+                "WiFi Call",
+            ),
+            selectedIndex = ui.wfcSpnFormat.value ?: 0,
+            busy = ui.wfcSpnFormat.isBusy,
+            error = if (ui.wfcSpnFormat.hasFailed) ui.wfcSpnFormat.message else null,
+        ) { viewModel.setWfcSpnFormat(it) }
+
+        if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
+            HeaderText(text = stringResource(R.string.root_vowifi_repair_title))
+            RootVoWifiPanel(ui = ui, viewModel = viewModel)
+        }
+
+        HeaderText(text = stringResource(R.string.config_section_indicators))
+        BooleanControlView(stringResource(R.string.show_vowifi_icon), ConfigControls.SHOW_VOWIFI_ICON, ui, onToggle)
+        BooleanControlView(stringResource(R.string.always_show_data_icon), ConfigControls.ALWAYS_SHOW_DATA_ICON, ui, onToggle)
+        BooleanControlView(stringResource(R.string.show_4g_for_lte_data_icon), ConfigControls.SHOW_4G_FOR_LTE, ui, onToggle)
+        BooleanControlView(stringResource(R.string.hide_enhanced_data_icon), ConfigControls.HIDE_ENHANCED_DATA_ICON, ui, onToggle)
+        BooleanControlView(stringResource(R.string.show_ims_status_in_sim_status), ConfigControls.SHOW_IMS_IN_SIM_INFO, ui, onToggle)
+
+        if (VERSION.SDK_INT >= VERSION_CODES.TIRAMISU) {
+            val statusBarManager: StatusBarManager = context.getSystemService(StatusBarManager::class.java)
+            val simSlotIndex = ui.simSlotIndex
+
+            HeaderText(text = stringResource(R.string.qstile))
+            ClickablePropertyView(label = stringResource(R.string.add_status_tile), value = "") {
+                statusBarManager.requestAddTileService(
+                    ComponentName(
+                        context,
+                        // TODO: what happens if someone tries to use this feature from a triple(or even dual)-SIM phone?
+                        Class.forName("dev.bluehouse.enablevolte.SIM${simSlotIndex + 1}IMSStatusQSTileService"),
+                    ),
+                    context.getString(R.string.qs_status_tile_title, (simSlotIndex + 1).toString()),
+                    Icon.createWithResource(context, R.drawable.ic_launcher_foreground),
+                    {},
+                    {},
+                )
+            }
+            ClickablePropertyView(label = stringResource(R.string.add_toggle_tile), value = "") {
+                statusBarManager.requestAddTileService(
+                    ComponentName(
+                        context,
+                        Class.forName("dev.bluehouse.enablevolte.SIM${simSlotIndex + 1}VoLTEConfigToggleQSTileService"),
+                    ),
+                    context.getString(R.string.qs_toggle_tile_title, (simSlotIndex + 1).toString()),
+                    Icon.createWithResource(context, R.drawable.ic_launcher_foreground),
+                    {},
+                    {},
+                )
+            }
+        }
+
+        HeaderText(text = stringResource(R.string.miscellaneous))
+        ClickablePropertyView(
+            label = stringResource(R.string.reset_all_settings),
+            value = stringResource(R.string.reverts_to_carrier_default),
+        ) { viewModel.resetAll() }
+        ClickablePropertyView(label = stringResource(R.string.expert_mode), value = "") {
+            navController.navigate("config/$subId/edit")
+        }
+        ClickablePropertyView(label = stringResource(R.string.dump_config), value = "") {
+            navController.navigate("config/$subId/dump")
+        }
+        ClickablePropertyView(label = stringResource(R.string.restart_ims_registration), value = "") {
+            viewModel.restartIms()
         }
     }
+}
 
-    if (loading) {
-        InfiniteLoadingDialog()
-    } else {
-        Column(modifier = Modifier.padding(Dp(16f)).verticalScroll(scrollState)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {}, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.sim_config))
-                }
-                OutlinedButton(
-                    onClick = { navController.navigate("bands/$subId") },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.bands))
-                }
-            }
+@Composable
+private fun RootVoWifiPanel(
+    ui: ConfigUiState,
+    viewModel: ConfigViewModel,
+) {
+    val status = ui.rootVoWifi
+    GlassSurface(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(18.dp)) {
             Text(
-                text = stringResource(
-                    if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
-                        R.string.root_sim_config_persistence
-                    } else {
-                        R.string.shizuku_sim_config_persistence
-                    },
-                ),
-                color = if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
+                text = if (status?.isVoWifiActive == true) {
+                    stringResource(R.string.root_vowifi_active)
+                } else {
+                    stringResource(R.string.root_vowifi_not_active)
+                },
+                color = if (status?.isVoWifiActive == true) {
                     MaterialTheme.colorScheme.primary
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                    MaterialTheme.colorScheme.onSurface
                 },
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 12.dp),
+                style = MaterialTheme.typography.titleMedium,
             )
-            HeaderText(text = stringResource(R.string.feature_toggles))
-            RadioSelectPropertyView(
-                label = stringResource(R.string.nr_architecture),
-                values = arrayOf(
-                    stringResource(R.string.nr_off),
-                    stringResource(R.string.nr_nsa),
-                    stringResource(R.string.nr_sa),
-                    stringResource(R.string.nr_nsa_sa),
-                ),
-                selectedIndex = nrAvailabilityIndex,
-            ) { requestedArchitecture ->
-                val nrAvailabilities = when (requestedArchitecture) {
-                    1 -> intArrayOf(CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA)
-                    2 -> intArrayOf(CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA)
-                    3 -> intArrayOf(
-                        CarrierConfigManager.CARRIER_NR_AVAILABILITY_NSA,
-                        CarrierConfigManager.CARRIER_NR_AVAILABILITY_SA,
-                    )
-                    else -> intArrayOf()
-                }
-                moder.updateCarrierConfig(
-                    CarrierConfigManager.KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
-                    nrAvailabilities,
-                )
-                nrAvailabilityIndex = requestedArchitecture
-            }
-
-            RadioSelectPropertyView(
-                label = stringResource(R.string.radio_mode),
-                values = arrayOf(
-                    stringResource(R.string.radio_default),
-                    stringResource(R.string.radio_5g_preferred),
-                    stringResource(R.string.radio_nr_only),
-                ),
-                selectedIndex = radioModeIndex,
-            ) { requestedMode ->
-                if (moder.setRadioMode(requestedMode)) {
-                    radioModeIndex = requestedMode
-                }
-            }
-            ClickablePropertyView(
-                label = stringResource(R.string.radio_warning),
-                value = "",
-            )
-
-            BooleanPropertyView(label = stringResource(R.string.enable_volte), toggled = voLTEEnabled) {
-                voLTEEnabled =
-                    if (voLTEEnabled) {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_VOLTE_AVAILABLE_BOOL, false)
-                        false
-                    } else {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_VOLTE_AVAILABLE_BOOL, true)
-                        moder.restartIMSRegistration()
-                        true
-                    }
-            }
-
-            BooleanPropertyView(
-                label = stringResource(R.string.enable_vonr),
-                toggled = voNREnabled,
-                minSdk = VERSION_CODES.UPSIDE_DOWN_CAKE,
-            ) {
-                if (VERSION.SDK_INT >= VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    voNREnabled =
-                        if (voNREnabled) {
-                            moder.updateCarrierConfig(CarrierConfigManager.KEY_VONR_ENABLED_BOOL, false)
-                            moder.updateCarrierConfig(CarrierConfigManager.KEY_VONR_SETTING_VISIBILITY_BOOL, false)
-                            false
-                        } else {
-                            moder.updateCarrierConfig(CarrierConfigManager.KEY_VONR_ENABLED_BOOL, true)
-                            moder.updateCarrierConfig(CarrierConfigManager.KEY_VONR_SETTING_VISIBILITY_BOOL, true)
-                            moder.restartIMSRegistration()
-                            true
-                        }
-                }
-            }
-
-            BooleanPropertyView(
-                label = stringResource(R.string.enable_crosssim),
-                toggled = crossSIMEnabled,
-                minSdk = VERSION_CODES.TIRAMISU,
-            ) {
-                if (VERSION.SDK_INT >= VERSION_CODES.TIRAMISU) {
-                    crossSIMEnabled =
-                        if (crossSIMEnabled) {
-                            moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_CROSS_SIM_IMS_AVAILABLE_BOOL, false)
-                            moder.updateCarrierConfig(CarrierConfigManager.KEY_ENABLE_CROSS_SIM_CALLING_ON_OPPORTUNISTIC_DATA_BOOL, false)
-                            false
-                        } else {
-                            moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_CROSS_SIM_IMS_AVAILABLE_BOOL, true)
-                            moder.updateCarrierConfig(CarrierConfigManager.KEY_ENABLE_CROSS_SIM_CALLING_ON_OPPORTUNISTIC_DATA_BOOL, true)
-                            moder.restartIMSRegistration()
-                            true
-                        }
-                }
-            }
-            BooleanPropertyView(label = stringResource(R.string.enable_vowifi), toggled = voWiFiEnabled) {
-                voWiFiEnabled =
-                    if (voWiFiEnabled) {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, false)
-                        false
-                    } else {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, true)
-                        moder.restartIMSRegistration()
-                        true
-                    }
-            }
-            BooleanPropertyView(label = stringResource(R.string.enable_vowifi_while_roamed), toggled = voWiFiEnabledWhileRoaming) {
-                voWiFiEnabledWhileRoaming =
-                    if (voWiFiEnabledWhileRoaming) {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_DEFAULT_WFC_IMS_ROAMING_ENABLED_BOOL, false)
-                        false
-                    } else {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_DEFAULT_WFC_IMS_ROAMING_ENABLED_BOOL, true)
-                        moder.restartIMSRegistration()
-                        true
-                    }
-            }
-            if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
-                HeaderText(text = stringResource(R.string.root_vowifi_repair_title))
-                GlassSurface(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(18.dp)) {
-                        Text(
-                            text = if (rootVoWifiStatus?.isVoWifiActive == true) {
-                                stringResource(R.string.root_vowifi_active)
-                            } else {
-                                stringResource(R.string.root_vowifi_not_active)
-                            },
-                            color = if (rootVoWifiStatus?.isVoWifiActive == true) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        rootVoWifiStatus?.let { status ->
-                            Text(
-                                stringResource(
-                                    R.string.root_vowifi_status,
-                                    if (status.settingEnabled) "Enabled" else "Disabled",
-                                    status.modeLabel,
-                                    status.registrationLabel,
-                                    status.transportLabel,
-                                    if (status.wifiState == 3) "On" else "Off",
-                                ),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            if (status.message.isNotBlank()) {
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    status.message,
-                                    color = if (status.operationSucceeded) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                            if (status.failureReason.isNotBlank() && !status.isVoWifiActive) {
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    status.failureReason,
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        } ?: Text(stringResource(R.string.root_vowifi_reading))
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            stringResource(R.string.root_vowifi_limit),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Spacer(Modifier.height(14.dp))
-                        if (rootVoWifiBusy) {
-                            CircularProgressIndicator()
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Button(
-                                    onClick = {
-                                        rootVoWifiBusy = true
-                                        scope.launch {
-                                            rootVoWifiStatus = withContext(Dispatchers.IO) {
-                                                moder.applyRootVoWifiRepair()
-                                            }
-                                            rootVoWifiBusy = false
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    Text(stringResource(R.string.root_vowifi_apply))
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        rootVoWifiBusy = true
-                                        scope.launch {
-                                            rootVoWifiStatus = withContext(Dispatchers.IO) {
-                                                PrivilegeManager.getRootVoWifiStatus(subId)
-                                            }
-                                            rootVoWifiBusy = false
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    Text(stringResource(R.string.refresh))
-                                }
-                            }
-                            if (rootVoWifiStatus?.snapshotAvailable == true) {
-                                Spacer(Modifier.height(8.dp))
-                                OutlinedButton(
-                                    onClick = {
-                                        rootVoWifiBusy = true
-                                        scope.launch {
-                                            rootVoWifiStatus = withContext(Dispatchers.IO) {
-                                                moder.restoreRootVoWifiRepair()
-                                            }
-                                            rootVoWifiBusy = false
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(stringResource(R.string.root_vowifi_restore))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if (VERSION.SDK_INT >= VERSION_CODES.Q) {
-                BooleanPropertyView(
-                    label = stringResource(R.string.enable_ss_over_ut),
-                    toggled = ssOverUtEnabled,
-                ) {
-                    ssOverUtEnabled =
-                        if (ssOverUtEnabled) {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_CARRIER_SUPPORTS_SS_OVER_UT_BOOL,
-                                false,
-                            )
-                            false
-                        } else {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_CARRIER_SUPPORTS_SS_OVER_UT_BOOL,
-                                true,
-                            )
-                            moder.restartIMSRegistration()
-                            true
-                        }
-                }
-            }
-            BooleanPropertyView(label = stringResource(R.string.enable_ss_over_cdma), toggled = ssOverCDMAEnabled) {
-                ssOverCDMAEnabled =
-                    if (ssOverCDMAEnabled) {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_SUPPORT_SS_OVER_CDMA_BOOL, false)
-                        false
-                    } else {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_SUPPORT_SS_OVER_CDMA_BOOL, true)
-                        moder.restartIMSRegistration()
-                        true
-                    }
-            }
-            BooleanPropertyView(label = stringResource(R.string.enable_video_calling_vt), toggled = vtEnabled) {
-                vtEnabled =
-                    if (vtEnabled) {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_VT_AVAILABLE_BOOL, false)
-                        false
-                    } else {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_VT_AVAILABLE_BOOL, true)
-                        moder.restartIMSRegistration()
-                        true
-                    }
-            }
-            if (VERSION.SDK_INT >= VERSION_CODES.Q) {
-                BooleanPropertyView(
-                    label = stringResource(R.string.enable_enhanced_4g_lte_plus),
-                    toggled = is4GPlusEnabled,
-                ) {
-                    is4GPlusEnabled =
-                        if (is4GPlusEnabled) {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_EDITABLE_ENHANCED_4G_LTE_BOOL,
-                                false,
-                            )
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_ENHANCED_4G_LTE_ON_BY_DEFAULT_BOOL,
-                                false,
-                            )
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_HIDE_ENHANCED_4G_LTE_BOOL,
-                                true,
-                            )
-                            false
-                        } else {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_EDITABLE_ENHANCED_4G_LTE_BOOL,
-                                true,
-                            )
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_ENHANCED_4G_LTE_ON_BY_DEFAULT_BOOL,
-                                true,
-                            )
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_HIDE_ENHANCED_4G_LTE_BOOL,
-                                false,
-                            )
-                            true
-                        }
-                }
-            }
-            BooleanPropertyView(label = stringResource(R.string.allow_adding_apns), toggled = allowAddingAPNs) {
-                allowAddingAPNs =
-                    if (allowAddingAPNs) {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_ALLOW_ADDING_APNS_BOOL, false)
-                        false
-                    } else {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_ALLOW_ADDING_APNS_BOOL, true)
-                        true
-                    }
-            }
-
-            HeaderText(text = stringResource(R.string.string_values))
-            UserAgentPropertyView(label = stringResource(R.string.user_agent), value = configuredUserAgent) {
-                moder.updateCarrierConfig(moder.KEY_IMS_USER_AGENT, it)
-                configuredUserAgent = it
-            }
-
-            HeaderText(text = stringResource(R.string.cosmetic_toggles))
-            if (VERSION.SDK_INT >= VERSION_CODES.R) {
-                BooleanPropertyView(
-                    label = stringResource(R.string.show_vowifi_preference_in_settings),
-                    toggled = showVoWifiMode,
-                    minSdk = VERSION_CODES.R,
-                ) {
-                    showVoWifiMode =
-                        if (showVoWifiMode) {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_EDITABLE_WFC_MODE_BOOL,
-                                false,
-                            )
-                            false
-                        } else {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_EDITABLE_WFC_MODE_BOOL,
-                                true,
-                            )
-                            moder.restartIMSRegistration()
-                            true
-                        }
-                }
-            }
-            if (VERSION.SDK_INT >= VERSION_CODES.R) {
-                BooleanPropertyView(
-                    label = stringResource(R.string.show_vowifi_roaming_preference_in_settings),
-                    toggled = showVoWifiRoamingMode,
-                    minSdk = VERSION_CODES.R,
-                ) {
-                    showVoWifiRoamingMode =
-                        if (showVoWifiRoamingMode) {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_EDITABLE_WFC_ROAMING_MODE_BOOL,
-                                false,
-                            )
-                            false
-                        } else {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_EDITABLE_WFC_ROAMING_MODE_BOOL,
-                                true,
-                            )
-                            moder.restartIMSRegistration()
-                            true
-                        }
-                }
-            }
-            RadioSelectPropertyView(
-                label = stringResource(R.string.wi_fi_calling_carrier_name_format),
-                values =
-                    arrayOf(
-                        "%s".format(carrierName),
-                        "%s Wi-Fi Calling".format(carrierName),
-                        "WLAN Call",
-                        "%s WLAN Call".format(carrierName),
-                        "%s Wi-Fi".format(carrierName),
-                        "WiFi Calling | %s".format(carrierName),
-                        "%s VoWifi".format(carrierName),
-                        "Wi-Fi Calling",
-                        "Wi-Fi",
-                        "WiFi Calling",
-                        "VoWifi",
-                        "%s WiFi Calling".format(carrierName),
-                        "WiFi Call",
+            Spacer(Modifier.height(8.dp))
+            if (status == null) {
+                Text(stringResource(R.string.root_vowifi_reading))
+            } else {
+                Text(
+                    stringResource(
+                        R.string.root_vowifi_status,
+                        if (status.settingEnabled) "Enabled" else "Disabled",
+                        status.modeLabel,
+                        status.registrationLabel,
+                        status.transportLabel,
+                        if (status.wifiState == 3) "On" else "Off",
                     ),
-                selectedIndex = wfcSpnFormatIndex,
-            ) {
-                moder.updateCarrierConfig(CarrierConfigManager.KEY_WFC_SPN_FORMAT_IDX_INT, it)
-                wfcSpnFormatIndex = it
-            }
-            BooleanPropertyView(label = stringResource(R.string.show_wifi_only_for_vowifi), toggled = supportWfcWifiOnly) {
-                supportWfcWifiOnly =
-                    if (supportWfcWifiOnly) {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, false)
-                        false
-                    } else {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, true)
-                        moder.restartIMSRegistration()
-                        true
-                    }
-            }
-            BooleanPropertyView(label = stringResource(R.string.show_vowifi_icon), toggled = showVoWifiIcon) {
-                showVoWifiIcon =
-                    if (showVoWifiIcon) {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_SHOW_WIFI_CALLING_ICON_IN_STATUS_BAR_BOOL, false)
-                        false
-                    } else {
-                        moder.updateCarrierConfig(CarrierConfigManager.KEY_SHOW_WIFI_CALLING_ICON_IN_STATUS_BAR_BOOL, true)
-                        true
-                    }
-            }
-            if (VERSION.SDK_INT >= VERSION_CODES.R) {
-                BooleanPropertyView(
-                    label = stringResource(R.string.always_show_data_icon),
-                    toggled = alwaysDataRATIcon,
-                    minSdk = VERSION_CODES.R,
-                ) {
-                    alwaysDataRATIcon =
-                        if (alwaysDataRATIcon) {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_ALWAYS_SHOW_DATA_RAT_ICON_BOOL,
-                                false,
-                            )
-                            false
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (status.message.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        status.message,
+                        color = if (status.operationSucceeded) {
+                            MaterialTheme.colorScheme.primary
                         } else {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_ALWAYS_SHOW_DATA_RAT_ICON_BOOL,
-                                true,
-                            )
-                            true
-                        }
-                }
-                BooleanPropertyView(
-                    label = stringResource(R.string.show_4g_for_lte_data_icon),
-                    toggled = show4GForLteEnabled,
-                    minSdk = VERSION_CODES.R,
-                ) {
-                    show4GForLteEnabled =
-                        if (show4GForLteEnabled) {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_SHOW_4G_FOR_LTE_DATA_ICON_BOOL,
-                                false,
-                            )
-                            false
-                        } else {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_SHOW_4G_FOR_LTE_DATA_ICON_BOOL,
-                                true,
-                            )
-                            true
-                        }
-                }
-                BooleanPropertyView(
-                    label = stringResource(R.string.hide_enhanced_data_icon),
-                    toggled = hideEnhancedDataIconEnabled,
-                    minSdk = VERSION_CODES.R,
-                ) {
-                    hideEnhancedDataIconEnabled =
-                        if (hideEnhancedDataIconEnabled) {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_HIDE_LTE_PLUS_DATA_ICON_BOOL,
-                                false,
-                            )
-                            false
-                        } else {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_HIDE_LTE_PLUS_DATA_ICON_BOOL,
-                                true,
-                            )
-                            true
-                        }
-                }
-                BooleanPropertyView(
-                    label = stringResource(R.string.show_ims_status_in_sim_status),
-                    toggled = showIMSinSIMInfo,
-                    minSdk = VERSION_CODES.R,
-                ) {
-                    showIMSinSIMInfo =
-                        if (showIMSinSIMInfo) {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_SHOW_IMS_REGISTRATION_STATUS_BOOL,
-                                false,
-                            )
-                            false
-                        } else {
-                            moder.updateCarrierConfig(
-                                CarrierConfigManager.KEY_SHOW_IMS_REGISTRATION_STATUS_BOOL,
-                                true,
-                            )
-                            true
-                        }
-                }
-            }
-
-            if (VERSION.SDK_INT >= VERSION_CODES.TIRAMISU) {
-                val statusBarManager: StatusBarManager = context.getSystemService(StatusBarManager::class.java)
-
-                HeaderText(text = stringResource(R.string.qstile))
-                ClickablePropertyView(
-                    label = stringResource(R.string.add_status_tile),
-                    value = "",
-                ) {
-                    statusBarManager.requestAddTileService(
-                        ComponentName(
-                            context,
-                            // TODO: what happens if someone tries to use this feature from a triple(or even dual)-SIM phone?
-                            Class.forName("dev.bluehouse.enablevolte.SIM${simSlotIndex + 1}IMSStatusQSTileService"),
-                        ),
-                        context.getString(R.string.qs_status_tile_title, (simSlotIndex + 1).toString()),
-                        Icon.createWithResource(context, R.drawable.ic_launcher_foreground),
-                        {},
-                        {},
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                ClickablePropertyView(
-                    label = stringResource(R.string.add_toggle_tile),
-                    value = "",
-                ) {
-                    statusBarManager.requestAddTileService(
-                        ComponentName(
-                            context,
-                            Class.forName("dev.bluehouse.enablevolte.SIM${simSlotIndex + 1}VoLTEConfigToggleQSTileService"),
-                        ),
-                        context.getString(R.string.qs_toggle_tile_title, (simSlotIndex + 1).toString()),
-                        Icon.createWithResource(context, R.drawable.ic_launcher_foreground),
-                        {},
-                        {},
-                    )
+                if (status.failureReason.isNotBlank() && !status.isVoWifiActive) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(status.failureReason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            HeaderText(text = stringResource(R.string.miscellaneous))
-            ClickablePropertyView(
-                label = stringResource(R.string.reset_all_settings),
-                value = stringResource(R.string.reverts_to_carrier_default),
-            ) {
-                moder.clearCarrierConfig()
-                scope.launch {
-                    withContext(Dispatchers.Default) {
-                        loadFlags()
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.root_vowifi_limit),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(Modifier.height(14.dp))
+            if (ui.rootVoWifiBusy) {
+                CircularProgressIndicator()
+            } else {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { viewModel.applyRootVoWifiRepair() }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.root_vowifi_apply))
+                    }
+                    OutlinedButton(onClick = { viewModel.refreshRootVoWifi() }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.refresh))
                     }
                 }
-            }
-            ClickablePropertyView(
-                label = stringResource(R.string.expert_mode),
-                value = "",
-            ) {
-                navController.navigate("config/$subId/edit")
-            }
-            ClickablePropertyView(
-                label = stringResource(R.string.dump_config),
-                value = "",
-            ) {
-                navController.navigate("config/$subId/dump")
-            }
-            ClickablePropertyView(
-                label = stringResource(R.string.restart_ims_registration),
-                value = "",
-            ) {
-                moder.restartIMSRegistration()
+                if (status?.snapshotAvailable == true) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { viewModel.restoreRootVoWifiRepair() }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.root_vowifi_restore))
+                    }
+                }
             }
         }
     }
