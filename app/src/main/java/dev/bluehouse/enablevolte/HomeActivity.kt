@@ -46,6 +46,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import dev.bluehouse.enablevolte.pages.NetworkPage
+import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -415,7 +427,7 @@ fun PixelIMSApp(
             TopAppBar(
                 title = {
                     val route = currentBackStackEntry?.destination?.route
-                    if (route in setOf("home", "controls", "monitor", "field-test")) {
+                    if (route in setOf("home", "controls", "network", "field-test")) {
                         Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                             Text(
                                 stringResource(R.string.app_name),
@@ -484,62 +496,93 @@ fun PixelIMSApp(
         },
         bottomBar = {
             val currentRoute = currentBackStackEntry?.destination?.route
-            if (currentRoute in setOf("home", "controls", "monitor", "field-test", "config/{subId}", "bands/{subId}")) {
+            if (currentRoute in setOf("home", "controls", "network", "field-test", "config/{subId}", "bands/{subId}")) {
                 val currentDestination = currentBackStackEntry?.destination
                 val items = arrayListOf(
                     Screen("home", stringResource(R.string.home), Icons.Filled.Home),
                     Screen("controls", stringResource(R.string.controls), Icons.Filled.Tune),
-                    Screen("monitor", stringResource(R.string.monitor), Icons.Filled.SignalCellularAlt),
+                    Screen("network", stringResource(R.string.network), Icons.Filled.SignalCellularAlt),
                     Screen("field-test", stringResource(R.string.field_test_short), Icons.Filled.Science),
                 )
-                // Flush to the edge with a hairline above it, rather than a floating
-                // rounded pill: the bar is chrome, and should not read as a control.
-                Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
-                    HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(62.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                val inst = LocalInstrument.current
+                // The bar floats again in 2.0, but as a frosted plate with a lit
+                // edge rather than the opaque pill 1.0.6 shipped: it belongs to
+                // the same glass family as the panels it sits over.
+                Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().height(62.dp),
+                        shape = RoundedCornerShape(22.dp),
+                        color = Color.Transparent,
+                        border = BorderStroke(1.dp, inst.edgeBright),
+                        tonalElevation = 0.dp,
+                        shadowElevation = 12.dp,
                     ) {
-                        items.forEach { screen ->
-                            val selected = when {
-                                screen.route == "controls" ->
-                                    currentRoute in setOf("controls", "config/{subId}", "bands/{subId}")
-                                else -> currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                            }
-                            val tint = if (selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .clickable {
-                                        navController.navigate(screen.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(listOf(inst.frostHigh, inst.frost)),
+                                    RoundedCornerShape(22.dp),
+                                )
+                                .padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            items.forEach { screen ->
+                                val selected = when {
+                                    screen.route == "controls" ->
+                                        currentRoute in setOf("controls", "config/{subId}", "bands/{subId}")
+                                    else -> currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                                }
+                                val tint by animateColorAsState(
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
                                     },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                            ) {
-                                Icon(
-                                    screen.icon,
-                                    contentDescription = screen.title,
-                                    tint = tint,
-                                    modifier = Modifier.size(22.dp),
+                                    label = "nav tint",
                                 )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    screen.title,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = tint,
-                                    maxLines = 1,
+                                val lift by animateFloatAsState(
+                                    if (selected) 1f else 0f,
+                                    animationSpec = spring(dampingRatio = 0.6f, stiffness = 420f),
+                                    label = "nav lift",
                                 )
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable {
+                                            navController.navigate(screen.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        },
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    Icon(
+                                        screen.icon,
+                                        contentDescription = screen.title,
+                                        tint = tint,
+                                        modifier = Modifier.size(22.dp).graphicsLayer { translationY = -3f * lift },
+                                    )
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(
+                                        screen.title,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = tint,
+                                        maxLines = 1,
+                                    )
+                                    Spacer(Modifier.height(3.dp))
+                                    Box(
+                                        Modifier
+                                            .height(2.dp)
+                                            .width((16 * lift).dp)
+                                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+                                    )
+                                }
                             }
                         }
                     }
@@ -560,7 +603,12 @@ fun PixelIMSApp(
             composable("controls", context.resources.getString(R.string.controls)) {
                 ControlsHub(subscriptions, navController)
             }
-            composable("monitor", context.resources.getString(R.string.network_monitor)) {
+            composable("network", context.resources.getString(R.string.network)) {
+                NetworkPage(subscriptions, navController)
+            }
+            // The deep diagnostics hub keeps its own route: the attach trace,
+            // physical channels and config diff are still reachable from Network.
+            composable("network/diagnostics", context.resources.getString(R.string.network_monitor)) {
                 MonitoringHub(subscriptions)
             }
             composable("field-test", context.resources.getString(R.string.field_test)) {
