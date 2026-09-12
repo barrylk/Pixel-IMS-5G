@@ -4,12 +4,34 @@ An experimental root- or Shizuku-powered IMS and radio configuration app for Goo
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current public release: `2.0.0` (`v2.0.0`). This is a **major release**: a live network monitor with signal
-history and a cell-change log, on a rebuilt interface. The one-time uninstall/reinstall notice applies specifically
+Current public release: `2.1.0` (`v2.1.0`). The app now **opens on the answer**: a Setup screen that says
+whether 5G is working on this SIM, which check is blocking it, and offers the fix for that check. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
 ## Changelog
+
+### [2.1.0](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v2.1.0) - task-first setup
+
+**The app opens on the question you actually have.** Every version until now opened on a settings list,
+which assumes you already know which of twenty switches is holding 5G back.
+
+- **Setup screen.** Runs the checks that have to pass for 5G on this SIM, in dependency order, and names
+  the single one that is blocking: privilege, IMS support, VoLTE, NR architecture, band selection, VoNR,
+  the Magisk modem region patch, whether an NR cell is actually registered, and whether IMS registered.
+- **One-tap fixes.** Each failing check carries its own action - enable VoLTE, set NR to NSA + SA, enable
+  VoNR, apply the modem patch, restart IMS, or jump to band selection.
+- **Outcomes, not just settings.** The last two checks report what the radio is actually doing, so the
+  screen ends with evidence rather than intent.
+- **Nothing was removed.** Every individual switch is one tap away under *Expert settings*, and the
+  previous overview keeps its own route.
+
+**The panels are visible now.** 2.0's glass was ported from a web prototype where every panel also had
+`backdrop-filter: blur()` behind it. Android has no backdrop blur, and the alpha values came across without
+it - a 7% white fill over a near-black ground lands about ten levels above the background, which is an
+outline, not glass. The fill now carries roughly three times the alpha, the ground is lifted off the void
+so panels have something to sit above, and a one-pixel sheen along the top edge stands in for the highlight
+the blur used to give.
 
 ### [2.0.0](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v2.0.0) - live network monitor, new interface
 
