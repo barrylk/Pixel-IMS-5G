@@ -21,6 +21,43 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.0.0" ->
+                InstalledChangelog(
+                    version = "2.0.0",
+                    items =
+                        listOf(
+                            ChangelogItem(
+                                title = "Live network monitor",
+                                detail = "A new Network tab samples the radio every three seconds instead of taking one reading when you open a page. Serving cell, LTE anchor on NSA, and every neighbour cell in view, sorted by strength.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Signal history",
+                                detail = "A rolling plot of the last ninety samples with min, mean and max. A dropout has a shape - a cliff is a handover, a slow slide is you walking away from the cell.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Cell log",
+                                detail = "Handovers, band changes, NR leg up and down, service loss and sudden signal drops, each timestamped. Only real transitions are recorded, not every sample.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Full parameter grid",
+                                detail = "PCI, EARFCN and NR-ARFCN, TAC, cell ID, RSRQ, SINR, CSI-RSRP, CSI-SINR, RSSI, CQI, bandwidth and timing advance, all on one screen.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Rebuilt interface",
+                                detail = "A new design: a lit navy ground with frosted panels, an animated swept-arc gauge for the headline reading, and Chakra Petch and JetBrains Mono shipping with the app so measurements are set in a real fixed-width face.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Nothing was removed",
+                                detail = "The attach trace, physical channels, registry event log and CarrierConfig diff are all still there, now one tap away under Deep diagnostics on the Network tab.",
+                                tone = ChangelogTone.IMPORTANT,
+                            ),
+                        ),
+                )
             "1.0.9" ->
                 InstalledChangelog(
                     version = "1.0.9",

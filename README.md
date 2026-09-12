@@ -4,12 +4,40 @@ An experimental root- or Shizuku-powered IMS and radio configuration app for Goo
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current public release: `1.0.9` (`v1.0.9`). This is a **complete visual redesign** — the app moves from a
-violet glass theme to a neutral instrument palette, with monospaced measurements and grouped, uncluttered pages. The one-time uninstall/reinstall notice applies specifically
+Current public release: `2.0.0` (`v2.0.0`). This is a **major release**: a live network monitor with signal
+history and a cell-change log, on a rebuilt interface. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
 ## Changelog
+
+### [2.0.0](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v2.0.0) - live network monitor, new interface
+
+**Network monitoring.** The app could already read every field a cell monitor shows, but only as a one-shot
+snapshot taken when a page happened to open. 2.0 turns that into an actual monitor.
+
+- **Live sampling.** A new Network tab samples the radio every three seconds. Serving cell with the full
+  parameter set, the LTE anchor when the phone is on NSA, and every cell in view sorted by strength.
+- **Signal history.** A rolling plot of the last ninety RSRP samples with min, mean and max. A dropout has a
+  shape, and the shape is the diagnosis.
+- **Cell log.** Handover, band change, NR leg up and down, service lost, and drops of 12 dB or more - each
+  timestamped. Only real transitions are logged; a log that records every sample is a log nobody reads.
+- **Parameter grid.** PCI, EARFCN / NR-ARFCN, TAC, cell ID, RSRQ, SINR, CSI-RSRP, CSI-SINR, RSSI, CQI,
+  bandwidth and timing advance.
+- **Nothing was removed.** The attach trace, physical channels, TelephonyRegistry log and CarrierConfig diff
+  keep their own route, reachable from Network under *Deep diagnostics*.
+
+**Interface.** Rebuilt again, this time with depth.
+
+- A lit navy-teal ground with frosted panels over it. 1.0.9 was flat and neutral; translucency needs something
+  to be translucent over, which is what the original glass theme lacked.
+- An animated swept-arc gauge for the headline reading, with the quality ramp driving its colour.
+- **Chakra Petch** and **JetBrains Mono** now ship with the app, so display type and measurements have real
+  faces instead of whatever the device happened to substitute.
+- Corner radii return to 18-26dp, and the navigation bar floats again - as frosted glass with a lit edge,
+  matching the panels rather than the opaque pill of earlier versions.
+- Instrument tokens (panel fill, hairline, the good/fair/poor ramp) live in their own theme layer rather than
+  being squeezed into approximate Material roles.
 
 ### [1.0.9](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v1.0.9) - new interface
 

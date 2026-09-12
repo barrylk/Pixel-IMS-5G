@@ -236,7 +236,7 @@ class NetworkMonitorViewModel(
     }
 
     companion object {
-        private const val SAMPLE_INTERVAL_MS = 2_000L
+        private const val SAMPLE_INTERVAL_MS = 3_000L
         private const val HISTORY_LENGTH = 90
         private const val EVENT_LIMIT = 60
         private const val SIGNAL_DROP_DB = 12
