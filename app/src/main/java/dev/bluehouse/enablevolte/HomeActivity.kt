@@ -80,8 +80,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dev.bluehouse.enablevolte.components.OnLifecycleEvent
-import dev.bluehouse.enablevolte.components.GlassBackdrop
-import dev.bluehouse.enablevolte.components.GlassInfoDialog
+import dev.bluehouse.enablevolte.components.AppBackdrop
+import dev.bluehouse.enablevolte.components.InfoDialog
 import dev.bluehouse.enablevolte.components.WhatsNewDialog
 import dev.bluehouse.enablevolte.pages.Config
 import dev.bluehouse.enablevolte.pages.ControlsHub
@@ -134,7 +134,7 @@ class HomeActivity : ComponentActivity() {
 
         setContent {
             EnableVoLTETheme {
-                GlassBackdrop {
+                AppBackdrop {
                     PixelIMSApp(
                         startDestination = if (intent.getBooleanExtra(EXTRA_OPEN_UPDATES, false)) {
                             "home/about"
@@ -378,7 +378,7 @@ fun PixelIMSApp(
         showShizukuRegionalWarning &&
         selectedPrivilegeMode == PrivilegeMode.SHIZUKU.name
     ) {
-        GlassInfoDialog(
+        InfoDialog(
             title = stringResource(R.string.shizuku_regional_limit_title),
             message = stringResource(
                 R.string.shizuku_regional_limit_message,
@@ -620,7 +620,7 @@ fun PixelIMSApp(
 @Composable
 fun PixelIMSAppPreview() {
     EnableVoLTETheme {
-        GlassBackdrop {
+        AppBackdrop {
             PixelIMSApp()
         }
     }

@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.SriLankaCarrierProfiles
 import dev.bluehouse.enablevolte.SubscriptionModer
-import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.HeaderText
 import dev.bluehouse.enablevolte.uniqueName
 import kotlinx.coroutines.Dispatchers
@@ -109,7 +109,7 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
 
         error?.let { StatusCard(stringResource(R.string.monitor_error), it, MaterialTheme.colorScheme.error) }
         snapshot?.let { data ->
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(stringResource(R.string.connection_summary), style = MaterialTheme.typography.titleMedium)
                     FlowRow(
@@ -162,7 +162,7 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
             }
 
             if (history.size > 1) {
-                GlassSurface(modifier = Modifier.fillMaxWidth()) {
+                Panel(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text(stringResource(R.string.signal_history), style = MaterialTheme.typography.titleMedium)
                         SignalChart(history)
@@ -179,7 +179,7 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
                 StatusCard(stringResource(R.string.none_reported), stringResource(R.string.cell_visibility_limit))
             }
             data.cells.forEachIndexed { index, cell ->
-                GlassSurface(modifier = Modifier.fillMaxWidth()) {
+                Panel(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(
@@ -209,7 +209,7 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
 
         profile?.let { carrier ->
             HeaderText(text = stringResource(R.string.sri_lanka_carrier_profile))
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${carrier.name} (${carrier.operatorNumeric})", style = MaterialTheme.typography.titleMedium)
                     KeyValue("Sri Lanka LTE", carrier.lteBands.joinToString { "B$it" })
@@ -277,7 +277,7 @@ private fun KeyValue(label: String, value: String) {
 
 @Composable
 private fun StatusCard(title: String, body: String, titleColor: Color = MaterialTheme.colorScheme.onSurface) {
-    GlassSurface(modifier = Modifier.fillMaxWidth()) {
+    Panel(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor)
             Text(body)

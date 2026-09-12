@@ -1,10 +1,7 @@
 package dev.bluehouse.enablevolte.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,28 +11,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.bluehouse.enablevolte.ui.theme.NumericTextStyle
 import dev.bluehouse.enablevolte.ui.theme.SignalAmber
+import dev.bluehouse.enablevolte.ui.theme.SignalAmberDark
 import dev.bluehouse.enablevolte.ui.theme.SignalGreen
+import dev.bluehouse.enablevolte.ui.theme.SignalGreenDark
 import dev.bluehouse.enablevolte.ui.theme.SignalRed
+import dev.bluehouse.enablevolte.ui.theme.SignalRedDark
 
 enum class StatusTone {
     ACCENT,
@@ -45,16 +41,31 @@ enum class StatusTone {
     NEUTRAL,
 }
 
+/**
+ * Signal colours are chosen per theme.
+ *
+ * A single green that reads well on near-black is washed out on white, and the
+ * reverse, so each tone carries a pair and the theme picks.
+ */
 @Composable
-fun statusToneColor(tone: StatusTone): Color =
-    when (tone) {
+fun statusToneColor(tone: StatusTone): Color {
+    val dark = isSystemInDarkTheme()
+    return when (tone) {
         StatusTone.ACCENT -> MaterialTheme.colorScheme.primary
-        StatusTone.SUCCESS -> SignalGreen
-        StatusTone.WARNING -> SignalAmber
-        StatusTone.DANGER -> SignalRed
+        StatusTone.SUCCESS -> if (dark) SignalGreen else SignalGreenDark
+        StatusTone.WARNING -> if (dark) SignalAmber else SignalAmberDark
+        StatusTone.DANGER -> if (dark) SignalRed else SignalRedDark
         StatusTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+}
 
+/**
+ * The heading block at the top of a page.
+ *
+ * The entrance animation is gone: it delayed the first reading by about
+ * 400 ms every time a page opened, and a measurement tool should not make you
+ * wait to be told what it measured.
+ */
 @Composable
 fun PremiumPageIntro(
     eyebrow: String,
@@ -62,35 +73,29 @@ fun PremiumPageIntro(
     description: String,
     modifier: Modifier = Modifier,
 ) {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { visible = true }
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(380)) + slideInVertically(tween(420)) { it / 5 },
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
-            modifier = modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Text(
-                text = eyebrow.uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = eyebrow.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
+/** A small state marker: a dot and a word, in the tone's colour. */
 @Composable
 fun PremiumStatusChip(
     label: String,
@@ -100,26 +105,27 @@ fun PremiumStatusChip(
     val color = statusToneColor(tone)
     Surface(
         modifier = modifier,
-        shape = CircleShape,
-        color = color.copy(alpha = 0.13f),
+        shape = RoundedCornerShape(6.dp),
+        color = color.copy(alpha = 0.10f),
         contentColor = color,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Spacer(Modifier.size(7.dp).background(color, CircleShape))
-            Text(
-                label,
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-                softWrap = false,
-            )
+            Spacer(Modifier.size(6.dp).background(color, CircleShape))
+            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
         }
     }
 }
 
+/**
+ * One measured value with its label.
+ *
+ * The value is monospaced so a column of readings stays aligned and the digits
+ * do not shift sideways as a live measurement updates.
+ */
 @Composable
 fun PremiumMetric(
     label: String,
@@ -127,11 +133,7 @@ fun PremiumMetric(
     tone: StatusTone,
     modifier: Modifier = Modifier,
 ) {
-    val color = statusToneColor(tone)
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             label.uppercase(),
             style = MaterialTheme.typography.labelMedium,
@@ -139,14 +141,21 @@ fun PremiumMetric(
         )
         Text(
             value,
-            style = MaterialTheme.typography.titleMedium,
-            color = color,
+            style = NumericTextStyle,
+            color = statusToneColor(tone),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
+/**
+ * A navigable row.
+ *
+ * The icon is a plain tinted glyph rather than a filled circle on a tinted
+ * card; at five or six of these on a page the old treatment was most of the
+ * colour on screen.
+ */
 @Composable
 fun PremiumActionRow(
     title: String,
@@ -160,26 +169,17 @@ fun PremiumActionRow(
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = color.copy(alpha = 0.09f),
+        shape = MaterialTheme.shapes.medium,
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                shape = CircleShape,
-                color = color.copy(alpha = 0.14f),
-                contentColor = color,
-            ) {
-                Icon(icon, contentDescription = null, modifier = Modifier.padding(10.dp).size(21.dp))
-            }
-            Spacer(Modifier.width(13.dp))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(
                     subtitle,
@@ -190,9 +190,9 @@ fun PremiumActionRow(
                 )
             }
             Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = color,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -206,23 +206,30 @@ fun PremiumSectionLabel(
 ) {
     Text(
         text = text.uppercase(),
-        modifier = modifier.padding(start = 4.dp, top = 5.dp),
+        modifier = modifier.padding(start = 4.dp, top = 4.dp),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
+/**
+ * The container for a single property row.
+ *
+ * Flat and opaque. Rows placed consecutively inside a [PanelGroup] read as one
+ * grouped list; used on their own they still sit clearly on the page.
+ */
 @Composable
 fun CompactPropertySurface(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    val color = MaterialTheme.colorScheme.surfaceContainer
     if (onClick == null) {
         Surface(
             modifier = modifier,
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.52f),
+            shape = MaterialTheme.shapes.medium,
+            color = color,
             contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 0.dp,
             content = content,
@@ -231,8 +238,8 @@ fun CompactPropertySurface(
         Surface(
             onClick = onClick,
             modifier = modifier,
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.52f),
+            shape = MaterialTheme.shapes.medium,
+            color = color,
             contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 0.dp,
             content = content,

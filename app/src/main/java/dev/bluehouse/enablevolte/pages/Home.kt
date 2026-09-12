@@ -35,7 +35,7 @@ import dev.bluehouse.enablevolte.PrivilegeMode
 import dev.bluehouse.enablevolte.ShizukuStatus
 import dev.bluehouse.enablevolte.SubscriptionModer
 import dev.bluehouse.enablevolte.checkShizukuPermission
-import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PremiumActionRow
 import dev.bluehouse.enablevolte.components.PremiumMetric
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
@@ -126,7 +126,7 @@ fun Home(navController: NavController) {
         )
 
         PremiumSectionLabel(stringResource(R.string.premium_system_readiness))
-        GlassSurface(Modifier.fillMaxWidth()) {
+        Panel(Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -222,7 +222,7 @@ fun Home(navController: NavController) {
             } else {
                 null
             }
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

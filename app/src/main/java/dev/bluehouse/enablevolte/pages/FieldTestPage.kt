@@ -40,7 +40,7 @@ import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.PrivilegeMode
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.SubscriptionModer
-import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
 import dev.bluehouse.enablevolte.components.PremiumSectionLabel
 import dev.bluehouse.enablevolte.components.PremiumStatusChip
@@ -225,7 +225,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
             }
         }
 
-        GlassSurface(Modifier.fillMaxWidth()) {
+        Panel(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     Modifier.fillMaxWidth(),
@@ -269,7 +269,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
             }
         }
 
-        GlassSurface(Modifier.fillMaxWidth()) {
+        Panel(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     Modifier.fillMaxWidth(),
@@ -325,7 +325,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
         }
 
         if (status != null || error != null) {
-            GlassSurface(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     PremiumStatusChip(
                         label = if (error == null) {
@@ -341,7 +341,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
             }
         }
         result?.let { report ->
-            GlassSurface(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     PremiumStatusChip(stringResource(R.string.field_test_complete), StatusTone.SUCCESS)
                     Text(

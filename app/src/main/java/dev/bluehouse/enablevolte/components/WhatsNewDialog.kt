@@ -42,7 +42,7 @@ fun WhatsNewDialog(
     onDismiss: () -> Unit,
 ) {
     BasicAlertDialog(onDismissRequest = onDismiss) {
-        GlassSurface(Modifier.fillMaxWidth()) {
+        Panel(Modifier.fillMaxWidth()) {
             Column(
                 modifier =
                     Modifier

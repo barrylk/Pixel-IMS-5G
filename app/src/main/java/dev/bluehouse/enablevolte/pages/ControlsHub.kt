@@ -18,7 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import dev.bluehouse.enablevolte.R
-import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PremiumActionRow
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
 import dev.bluehouse.enablevolte.components.PremiumSectionLabel
@@ -40,7 +40,7 @@ fun ControlsHub(
             description = stringResource(R.string.premium_controls_description),
         )
         if (subscriptions.isEmpty()) {
-            GlassSurface(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 Text(
                     stringResource(R.string.controls_no_sim),
                     Modifier.padding(18.dp),
@@ -50,7 +50,7 @@ fun ControlsHub(
         }
         subscriptions.forEach { subscription ->
             PremiumSectionLabel(subscription.uniqueName)
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),

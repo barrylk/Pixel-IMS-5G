@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -35,13 +34,18 @@ fun OnLifecycleEvent(onEvent: (owner: LifecycleOwner, event: Lifecycle.Event) ->
     }
 }
 
+/**
+ * A section heading.
+ *
+ * Medium rather than bold, and spaced generously above so the gap does the
+ * separating instead of the weight.
+ */
 @Composable
 fun HeaderText(text: String) {
-    Row(modifier = Modifier.padding(top = 18.dp, bottom = 5.dp, start = 4.dp)) {
+    Row(modifier = Modifier.padding(top = 24.dp, bottom = 8.dp, start = 4.dp)) {
         Text(
             text = text.uppercase(),
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

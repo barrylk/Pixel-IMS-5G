@@ -50,7 +50,7 @@ import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.PrivilegeMode
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.SubscriptionModer
-import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.HeaderText
 import dev.bluehouse.enablevolte.components.OnLifecycleEvent
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
@@ -121,7 +121,7 @@ fun MonitoringHub(subscriptions: List<SubscriptionInfo>) {
             description = context.getString(R.string.premium_monitor_description),
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         )
-        GlassSurface(
+        Panel(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -231,7 +231,7 @@ private fun PhysicalChannelsPage() {
                 Text(if (loading) "Reading physical channels…" else "Refresh physical channels")
             }
             output?.lineSequence()?.filter { it.isNotBlank() }?.forEachIndexed { index, line ->
-                GlassSurface(Modifier.fillMaxWidth()) {
+                Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         val role = when {
                             line.contains("PrimaryServing") -> "PCell"
@@ -244,7 +244,7 @@ private fun PhysicalChannelsPage() {
                 }
             }
         } else {
-            GlassSurface(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 Text(
                     "Root required. Shizuku cannot read READ_PRECISE_PHONE_STATE physical-channel " +
                         "internals on current Tensor Pixel builds.",
@@ -385,7 +385,7 @@ private fun AttachTracePage(subscriptions: List<SubscriptionInfo>) {
             events = emptyList()
         }
 
-        GlassSurface(Modifier.fillMaxWidth()) {
+        Panel(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Callback sources", style = MaterialTheme.typography.titleMedium)
                 DiagnosticRow("TelephonyRegistry", registryState, registryState.startsWith("Active"))
@@ -423,7 +423,7 @@ private fun AttachTracePage(subscriptions: List<SubscriptionInfo>) {
             val localNrOpen = gates?.gates?.filter { it.mask != null }?.all { it.nrAllowed } == true
             val nsaConnected = current.displayTechnology == "5G NSA" || current.nrState == 3
             val reason = attachReason(current, carrierNr, localNrOpen)
-            GlassSurface(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text("Live attach sequence", style = MaterialTheme.typography.titleMedium)
                     TraceStep("LTE registered", current.serviceState == "In service" && current.dataRat in setOf("LTE", "NR"))
@@ -447,7 +447,7 @@ private fun AttachTracePage(subscriptions: List<SubscriptionInfo>) {
             }
         }
 
-        GlassSurface(Modifier.fillMaxWidth()) {
+        Panel(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Root attach evidence", style = MaterialTheme.typography.titleMedium)
                 if (PrivilegeManager.activeMode == PrivilegeMode.ROOT && PrivilegeManager.isRootReady()) {
@@ -481,7 +481,7 @@ private fun AttachTracePage(subscriptions: List<SubscriptionInfo>) {
         }
 
         if (events.isNotEmpty()) {
-            GlassSurface(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("TelephonyRegistry event log", style = MaterialTheme.typography.titleMedium)
                     events.forEach { Text("${it.time}  ${it.text}", style = MaterialTheme.typography.bodySmall) }
@@ -572,7 +572,7 @@ private fun CarrierConfigDiffPage(subscriptions: List<SubscriptionInfo>) {
         )
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         rows.forEach {
-            GlassSurface(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     DiagnosticRow(it.label, it.current, it.open)
                     Text(it.key, style = MaterialTheme.typography.labelSmall)
@@ -693,7 +693,7 @@ private fun NrCapabilitiesPage(subscriptions: List<SubscriptionInfo>) {
     ) {
         HeaderText("NR Capability Decoder")
         SubscriptionPicker(subscriptions, selectedSubId) { selectedSubId = it }
-        GlassSurface(Modifier.fillMaxWidth()) {
+        Panel(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Device and subscription", style = MaterialTheme.typography.titleMedium)
                 DiagnosticRow("NSA configured", stateText(gates?.carrierNsa), gates?.carrierNsa)

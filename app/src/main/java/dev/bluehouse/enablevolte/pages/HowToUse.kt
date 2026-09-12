@@ -25,10 +25,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.R
-import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.HeaderText
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
-import dev.bluehouse.enablevolte.ui.theme.PremiumCyan
+import dev.bluehouse.enablevolte.ui.theme.AccentBlue
 import dev.bluehouse.enablevolte.ui.theme.SignalAmber
 import dev.bluehouse.enablevolte.ui.theme.SignalGreen
 
@@ -57,7 +57,7 @@ fun HowToUse() {
             title = stringResource(R.string.how_to_shizuku_5g_title),
             steps = stringResource(R.string.how_to_shizuku_5g_steps),
             note = stringResource(R.string.how_to_shizuku_5g_note),
-            accent = PremiumCyan,
+            accent = AccentBlue,
             noteColor = SignalAmber,
             icon = Icons.Filled.PhoneAndroid,
         )
@@ -85,7 +85,7 @@ private fun FiveGGuideCard(
     icon: ImageVector,
     noteColor: Color = SignalAmber,
 ) {
-    GlassSurface(Modifier.fillMaxWidth()) {
+    Panel(Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(17.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -146,7 +146,7 @@ private fun FiveGGuideCard(
 
 @Composable
 private fun HowToCard(title: Int, body: Int) {
-    GlassSurface(Modifier.fillMaxWidth()) {
+    Panel(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(body))

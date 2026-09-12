@@ -39,7 +39,7 @@ import dev.bluehouse.enablevolte.PrivilegeMode
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.components.BooleanPropertyView
 import dev.bluehouse.enablevolte.components.ClickablePropertyView
-import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.HeaderText
 import dev.bluehouse.enablevolte.components.InfiniteLoadingDialog
 import dev.bluehouse.enablevolte.components.RadioSelectPropertyView
@@ -258,7 +258,7 @@ private fun RootVoWifiPanel(
     viewModel: ConfigViewModel,
 ) {
     val status = ui.rootVoWifi
-    GlassSurface(modifier = Modifier.fillMaxWidth()) {
+    Panel(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp)) {
             Text(
                 text = if (status?.isVoWifiActive == true) {

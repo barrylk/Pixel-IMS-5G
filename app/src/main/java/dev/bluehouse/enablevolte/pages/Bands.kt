@@ -46,7 +46,7 @@ import dev.bluehouse.enablevolte.PrivilegeMode
 import dev.bluehouse.enablevolte.RegionalModemPatchStatus
 import dev.bluehouse.enablevolte.SubscriptionModer
 import dev.bluehouse.enablevolte.components.ClickablePropertyView
-import dev.bluehouse.enablevolte.components.GlassSurface
+import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.HeaderText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -88,7 +88,7 @@ private fun bandFailureSummary(
 
 @Composable
 private fun RadioProfileChoice(label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
-    GlassSurface(
+    Panel(
         modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.42f),
         onClick = if (enabled) onClick else null,
     ) {
@@ -437,7 +437,7 @@ fun Bands(
             }
         }
         bandLoadError?.let { details ->
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -456,7 +456,7 @@ fun Bands(
             }
         }
         noServiceChange?.let { change ->
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.signal_lost_title), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.signal_lost_after_change, change))
@@ -471,7 +471,7 @@ fun Bands(
         }
 
         HeaderText(text = stringResource(R.string.easy_mode))
-        GlassSurface(
+        Panel(
             modifier = Modifier.fillMaxWidth(),
             onClick = { toggleEasyMode(!easyMode) },
         ) {
@@ -504,7 +504,7 @@ fun Bands(
 
         rootForceReport?.let { report ->
             HeaderText(text = stringResource(R.string.root_force_lab))
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -569,7 +569,7 @@ fun Bands(
 
         if (PrivilegeManager.activeMode == PrivilegeMode.SHIZUKU) {
             HeaderText(text = stringResource(R.string.shizuku_regional_profile))
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -630,7 +630,7 @@ fun Bands(
 
         if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
             HeaderText(text = stringResource(R.string.regional_modem_patch))
-            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            Panel(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),

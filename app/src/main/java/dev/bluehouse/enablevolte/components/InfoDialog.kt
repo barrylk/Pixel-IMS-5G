@@ -15,14 +15,14 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GlassInfoDialog(
+fun InfoDialog(
     title: String,
     message: String,
     confirmLabel: String,
     onDismiss: () -> Unit,
 ) {
     BasicAlertDialog(onDismissRequest = onDismiss) {
-        GlassSurface(Modifier.fillMaxWidth()) {
+        Panel(Modifier.fillMaxWidth()) {
             Column(
                 Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
