@@ -8,71 +8,130 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
 
+/**
+ * Tokens Material's own scheme has no slot for.
+ *
+ * Panel fill, hairline and the signal ramp are not "primary" or "surface" in
+ * Material's sense — they mean something specific here, and routing them
+ * through an approximate Material slot is how a palette quietly loses its
+ * meaning.
+ */
+data class InstrumentColors(
+    val frost: Color,
+    val frostHigh: Color,
+    val edge: Color,
+    val edgeBright: Color,
+    val good: Color,
+    val fair: Color,
+    val poor: Color,
+    val ember: Color,
+    val pulse: Color,
+    val glow: Color,
+    val isDark: Boolean,
+)
+
+private val DarkInstrument =
+    InstrumentColors(
+        frost = FrostDark,
+        frostHigh = FrostDarkHigh,
+        edge = EdgeDark,
+        edgeBright = EdgeDarkBright,
+        good = Good,
+        fair = Fair,
+        poor = Poor,
+        ember = Ember,
+        pulse = Pulse,
+        glow = Signal,
+        isDark = true,
+    )
+
+val LocalInstrument = staticCompositionLocalOf { DarkInstrument }
+
+private val LightInstrument =
+    InstrumentColors(
+        frost = FrostLight,
+        frostHigh = FrostLightHigh,
+        edge = EdgeLight,
+        edgeBright = EdgeLightBright,
+        good = GoodDeep,
+        fair = FairDeep,
+        poor = PoorDeep,
+        ember = EmberDeep,
+        pulse = Pulse,
+        glow = SignalDeep,
+        isDark = false,
+    )
+
 private val DarkColorScheme =
     darkColorScheme(
-        primary = AccentBlue,
-        onPrimary = Color(0xFF06121F),
-        secondary = InkOnSurfaceVariant,
-        tertiary = AccentBlue,
-        background = InkBackground,
-        onBackground = InkOnSurface,
-        surface = InkSurface,
-        onSurface = InkOnSurface,
-        surfaceContainerLowest = InkBackground,
-        surfaceContainerLow = InkSurfaceLow,
-        surfaceContainer = InkSurface,
-        surfaceContainerHigh = InkSurfaceHigh,
-        surfaceContainerHighest = InkSurfaceHighest,
-        surfaceVariant = InkSurfaceHigh,
-        onSurfaceVariant = InkOnSurfaceVariant,
-        outline = InkOutline,
-        outlineVariant = InkOutline,
-        error = SignalRed,
+        primary = Signal,
+        onPrimary = Color(0xFF00212C),
+        secondary = Ember,
+        onSecondary = Color(0xFF2A1600),
+        tertiary = Signal,
+        background = Void,
+        onBackground = Ink,
+        surface = Hull,
+        onSurface = Ink,
+        surfaceContainerLowest = Void,
+        surfaceContainerLow = Deck,
+        surfaceContainer = Hull,
+        surfaceContainerHigh = HullHigh,
+        surfaceContainerHighest = HullHigh,
+        surfaceVariant = HullHigh,
+        onSurfaceVariant = InkDim,
+        outline = EdgeDark,
+        outlineVariant = EdgeDark,
+        error = Poor,
+        onError = Color(0xFF2B0007),
     )
 
 private val LightColorScheme =
     lightColorScheme(
-        primary = AccentBlueDark,
+        primary = SignalDeep,
         onPrimary = Color(0xFFFFFFFF),
-        secondary = PaperOnSurfaceVariant,
-        tertiary = AccentBlueDark,
-        background = PaperBackground,
-        onBackground = PaperOnSurface,
-        surface = PaperSurface,
-        onSurface = PaperOnSurface,
-        surfaceContainerLowest = PaperSurface,
-        surfaceContainerLow = PaperSurfaceLow,
-        surfaceContainer = PaperSurface,
-        surfaceContainerHigh = PaperSurfaceHigh,
-        surfaceContainerHighest = PaperSurfaceHighest,
-        surfaceVariant = PaperSurfaceHigh,
-        onSurfaceVariant = PaperOnSurfaceVariant,
-        outline = PaperOutline,
-        outlineVariant = PaperOutline,
-        error = SignalRedDark,
+        secondary = EmberDeep,
+        onSecondary = Color(0xFFFFFFFF),
+        tertiary = SignalDeep,
+        background = Paper,
+        onBackground = PaperInk,
+        surface = PaperHull,
+        onSurface = PaperInk,
+        surfaceContainerLowest = PaperHull,
+        surfaceContainerLow = PaperHull,
+        surfaceContainer = PaperHull,
+        surfaceContainerHigh = PaperHullHigh,
+        surfaceContainerHighest = PaperHullHigh,
+        surfaceVariant = PaperHullHigh,
+        onSurfaceVariant = PaperInkDim,
+        outline = EdgeLight,
+        outlineVariant = EdgeLight,
+        error = PoorDeep,
+        onError = Color(0xFFFFFFFF),
     )
 
 /**
- * Corner radii are deliberately small.
+ * Radii are soft again.
  *
- * Large radii read as consumer software. A measuring tool wants rectangular
- * panels that sit flush against each other, so the scale tops out where the
- * previous one started.
+ * 1.0.9 cut them to 10dp to look severe, which made panels read as boxes ruled
+ * onto the page. Glass has thickness, and thickness has a radius.
  */
 private val InstrumentShapes =
     Shapes(
-        extraSmall = RoundedCornerShape(6.dp),
-        small = RoundedCornerShape(8.dp),
-        medium = RoundedCornerShape(10.dp),
-        large = RoundedCornerShape(12.dp),
-        extraLarge = RoundedCornerShape(16.dp),
+        extraSmall = RoundedCornerShape(10.dp),
+        small = RoundedCornerShape(14.dp),
+        medium = RoundedCornerShape(18.dp),
+        large = RoundedCornerShape(22.dp),
+        extraLarge = RoundedCornerShape(26.dp),
     )
 
 @Suppress("ktlint:standard:function-naming")
@@ -81,10 +140,10 @@ fun EnableVoLTETheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    // Dynamic colour is deliberately not offered. The palette carries meaning —
-    // signal state, accent, neutral structure — and wallpaper-derived hues would
-    // put that at the mercy of the user's home screen.
+    // Dynamic colour stays off: the ramp means something, and a wallpaper does
+    // not know what a good RSRP looks like.
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val instrument = if (darkTheme) DarkInstrument else LightInstrument
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -97,10 +156,12 @@ fun EnableVoLTETheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        shapes = InstrumentShapes,
-        content = content,
-    )
+    CompositionLocalProvider(LocalInstrument provides instrument) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            shapes = InstrumentShapes,
+            content = content,
+        )
+    }
 }

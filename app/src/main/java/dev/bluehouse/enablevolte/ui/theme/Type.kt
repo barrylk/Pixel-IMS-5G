@@ -2,60 +2,72 @@ package dev.bluehouse.enablevolte.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextGeometricTransform
 import androidx.compose.ui.unit.sp
+import dev.bluehouse.enablevolte.R
 
 /**
- * A restrained type scale.
+ * Three faces, each with one job.
  *
- * The previous scale leaned on heavy weights and negative letter spacing, which
- * reads as marketing. Here headings are Medium or SemiBold at ordinary tracking,
- * sizes step gently, and emphasis comes from colour and position instead of
- * from weight.
+ * Chakra Petch is squared and slightly technical — it carries screen titles and
+ * headings without the marketing weight the old scale had. JetBrains Mono
+ * carries every measured value, because a column of readings has to stay in its
+ * columns while it updates. Everything a person reads as prose stays on the
+ * system face, which is the one tuned for the device it is being read on.
  */
+val Display = FontFamily(
+    Font(R.font.chakra_petch_semibold, FontWeight.SemiBold),
+    Font(R.font.chakra_petch_medium, FontWeight.Medium),
+)
+
+val Mono = FontFamily(
+    Font(R.font.jetbrains_mono_medium, FontWeight.Medium),
+    Font(R.font.jetbrains_mono_bold, FontWeight.Bold),
+)
+
 val Typography =
     Typography(
-        displaySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 36.sp),
-        headlineLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp),
-        headlineSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 21.sp, lineHeight = 27.sp),
-        titleLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp),
+        displayLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 40.sp, lineHeight = 44.sp, letterSpacing = (-0.5).sp),
+        displaySmall = TextStyle(fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 36.sp, letterSpacing = (-0.3).sp),
+        headlineLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp),
+        headlineSmall = TextStyle(fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 21.sp, lineHeight = 27.sp),
+        titleLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp),
         titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp),
+        titleSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 18.sp),
         bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 22.sp),
         bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
         bodySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 18.sp),
         labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp),
-        // Section headers. Small, spaced, upper-cased at the call site.
-        labelMedium = TextStyle(
-            fontFamily = FontFamily.SansSerif,
-            fontWeight = FontWeight.Medium,
-            fontSize = 11.sp,
-            lineHeight = 14.sp,
-            letterSpacing = 0.8.sp,
-        ),
-        labelSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 10.sp, lineHeight = 13.sp, letterSpacing = 0.6.sp),
+        // Field labels above readings: small, wide-tracked, always upper-cased.
+        labelMedium = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 10.sp, lineHeight = 13.sp, letterSpacing = 1.6.sp),
+        labelSmall = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 9.sp, lineHeight = 12.sp, letterSpacing = 1.2.sp),
     )
 
-/**
- * For measured values — NRARFCN, PCI, RSRP, band numbers, timestamps.
- *
- * Monospace so digits keep their columns as a reading updates, which is the
- * difference between a live measurement and a number that jitters sideways
- * every second.
- */
-val NumericTextStyle =
+/** The headline reading on a screen — the one number you look at first. */
+val ReadoutHuge =
     TextStyle(
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Medium,
-        fontSize = 15.sp,
-        lineHeight = 20.sp,
+        fontFamily = Mono,
+        fontWeight = FontWeight.Bold,
+        fontSize = 40.sp,
+        lineHeight = 42.sp,
+        letterSpacing = (-1.4).sp,
     )
 
-/** The same, sized for dense tables and secondary readouts. */
-val NumericSmallTextStyle =
-    TextStyle(
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-    )
+/** A value in a spec tile. */
+val ReadoutMedium =
+    TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 20.sp, letterSpacing = (-0.3).sp)
+
+/** Dense readings: neighbour rows, logs, raw captures. */
+val ReadoutSmall =
+    TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp)
+
+/** Names kept from 1.0.9 so existing readouts keep working. */
+val NumericTextStyle = ReadoutMedium
+val NumericSmallTextStyle = ReadoutSmall
+
+/** Condenses a long reading slightly rather than letting it wrap or clip. */
+val ReadoutTight =
+    ReadoutSmall.copy(textGeometricTransform = TextGeometricTransform(scaleX = 0.94f))

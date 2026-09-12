@@ -28,9 +28,9 @@ import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.HeaderText
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
-import dev.bluehouse.enablevolte.ui.theme.AccentBlue
-import dev.bluehouse.enablevolte.ui.theme.SignalAmber
-import dev.bluehouse.enablevolte.ui.theme.SignalGreen
+import dev.bluehouse.enablevolte.ui.theme.Signal
+import dev.bluehouse.enablevolte.ui.theme.Fair
+import dev.bluehouse.enablevolte.ui.theme.Good
 
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -49,7 +49,7 @@ fun HowToUse() {
             title = stringResource(R.string.how_to_root_5g_title),
             steps = stringResource(R.string.how_to_root_5g_steps),
             note = stringResource(R.string.how_to_root_5g_note),
-            accent = SignalGreen,
+            accent = Good,
             icon = Icons.Filled.AdminPanelSettings,
         )
         FiveGGuideCard(
@@ -57,8 +57,8 @@ fun HowToUse() {
             title = stringResource(R.string.how_to_shizuku_5g_title),
             steps = stringResource(R.string.how_to_shizuku_5g_steps),
             note = stringResource(R.string.how_to_shizuku_5g_note),
-            accent = AccentBlue,
-            noteColor = SignalAmber,
+            accent = Signal,
+            noteColor = Fair,
             icon = Icons.Filled.PhoneAndroid,
         )
         HeaderText(stringResource(R.string.how_to_use))
@@ -83,7 +83,7 @@ private fun FiveGGuideCard(
     note: String,
     accent: Color,
     icon: ImageVector,
-    noteColor: Color = SignalAmber,
+    noteColor: Color = Fair,
 ) {
     Panel(Modifier.fillMaxWidth()) {
         Column(

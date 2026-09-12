@@ -32,8 +32,8 @@ import dev.bluehouse.enablevolte.ChangelogItem
 import dev.bluehouse.enablevolte.ChangelogTone
 import dev.bluehouse.enablevolte.InstalledChangelog
 import dev.bluehouse.enablevolte.R
-import dev.bluehouse.enablevolte.ui.theme.SignalAmber
-import dev.bluehouse.enablevolte.ui.theme.SignalGreen
+import dev.bluehouse.enablevolte.ui.theme.Fair
+import dev.bluehouse.enablevolte.ui.theme.Good
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -145,6 +145,6 @@ private fun changelogStyle(tone: ChangelogTone): Pair<Color, ImageVector> =
     when (tone) {
         ChangelogTone.FEATURE -> MaterialTheme.colorScheme.primary to Icons.Filled.AutoAwesome
         ChangelogTone.IMPROVEMENT -> MaterialTheme.colorScheme.tertiary to Icons.Filled.Build
-        ChangelogTone.FIX -> SignalGreen to Icons.Filled.CheckCircle
-        ChangelogTone.IMPORTANT -> SignalAmber to Icons.Filled.Info
+        ChangelogTone.FIX -> Good to Icons.Filled.CheckCircle
+        ChangelogTone.IMPORTANT -> Fair to Icons.Filled.Info
     }
