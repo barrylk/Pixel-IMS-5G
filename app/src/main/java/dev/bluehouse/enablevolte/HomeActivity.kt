@@ -100,6 +100,7 @@ import dev.bluehouse.enablevolte.pages.Home
 import dev.bluehouse.enablevolte.pages.HowToUse
 import dev.bluehouse.enablevolte.pages.MonitoringHub
 import dev.bluehouse.enablevolte.pages.NetworkPage
+import dev.bluehouse.enablevolte.pages.SetupPage
 import dev.bluehouse.enablevolte.ui.theme.EnableVoLTETheme
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 import java.lang.IllegalStateException
@@ -500,7 +501,7 @@ fun PixelIMSApp(
             if (currentRoute in setOf("home", "controls", "network", "field-test", "config/{subId}", "bands/{subId}")) {
                 val currentDestination = currentBackStackEntry?.destination
                 val items = arrayListOf(
-                    Screen("home", stringResource(R.string.home), Icons.Filled.Home),
+                    Screen("home", stringResource(R.string.setup), Icons.Filled.Home),
                     Screen("controls", stringResource(R.string.controls), Icons.Filled.Tune),
                     Screen("network", stringResource(R.string.network), Icons.Filled.SignalCellularAlt),
                     Screen("field-test", stringResource(R.string.field_test_short), Icons.Filled.Science),
@@ -592,7 +593,12 @@ fun PixelIMSApp(
         },
     ) { innerPadding ->
         NavHost(navController, startDestination = startDestination, Modifier.padding(innerPadding)) {
-            composable("home", context.resources.getString(R.string.home)) {
+            composable("home", context.resources.getString(R.string.setup)) {
+                SetupPage(subscriptions, navController)
+            }
+            // The old readiness overview is still reachable; Setup answers the
+            // narrower question most people open the app with.
+            composable("home/overview", context.resources.getString(R.string.home)) {
                 Home(navController)
             }
             composable("home/about", context.resources.getString(R.string.about)) {
