@@ -36,6 +36,7 @@ data class InstrumentColors(
     val ember: Color,
     val pulse: Color,
     val glow: Color,
+    val sheen: Color,
     val isDark: Boolean,
 )
 
@@ -51,6 +52,7 @@ private val DarkInstrument =
         ember = Ember,
         pulse = Pulse,
         glow = Signal,
+        sheen = SheenDark,
         isDark = true,
     )
 
@@ -68,6 +70,7 @@ private val LightInstrument =
         ember = EmberDeep,
         pulse = Pulse,
         glow = SignalDeep,
+        sheen = SheenLight,
         isDark = false,
     )
 
@@ -78,7 +81,7 @@ private val DarkColorScheme =
         secondary = Ember,
         onSecondary = Color(0xFF2A1600),
         tertiary = Signal,
-        background = Void,
+        background = Deck,
         onBackground = Ink,
         surface = Hull,
         onSurface = Ink,

@@ -21,6 +21,38 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.1.0" ->
+                InstalledChangelog(
+                    version = "2.1.0",
+                    items =
+                        listOf(
+                            ChangelogItem(
+                                title = "The app opens on the answer",
+                                detail = "A new Setup screen tells you whether 5G is working on this SIM and, if it is not, which single thing is blocking it. No more hunting through twenty switches to find the one that matters.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "One-tap fixes",
+                                detail = "Each failing check carries the action that addresses it: enable VoLTE, set NR to NSA and SA, enable VoNR, apply the Magisk modem patch, restart IMS, or open band selection.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Checks run in order",
+                                detail = "There is no point telling you the modem refused EN-DC if VoLTE was never switched on. The last two checks are outcomes rather than settings — whether an NR cell is actually registered, and whether IMS registered.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                            ChangelogItem(
+                                title = "The panels are visible now",
+                                detail = "2.0 shipped the glass panels far too faint to see. The design was ported from a web prototype that had a background blur behind every panel, which Android cannot do — so the panels now carry the contrast themselves.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "Nothing was removed",
+                                detail = "Every individual carrier config switch is one tap away under Expert settings, and the previous overview screen is still there.",
+                                tone = ChangelogTone.IMPORTANT,
+                            ),
+                        ),
+                )
             "2.0.0" ->
                 InstalledChangelog(
                     version = "2.0.0",

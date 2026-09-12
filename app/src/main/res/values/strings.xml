@@ -109,6 +109,15 @@
     <string name="param_timing_advance">Timing advance</string>
     <string name="param_cell_id">Cell ID</string>
     <string name="network">Network</string>
+    <string name="setup">Setup</string>
+    <string name="setup_checking">Checking this SIM…</string>
+    <string name="setup_ready">5G is ready</string>
+    <string name="setup_not_ready">5G is not connecting</string>
+    <string name="setup_blocking">Blocking: %1$s</string>
+    <string name="setup_recheck">Check again</string>
+    <string name="setup_all_clear">All checks passed</string>
+    <string name="setup_expert">Expert settings</string>
+    <string name="setup_expert_summary">Every individual carrier config switch, for when you know exactly what you want to change.</string>
     <string name="network_diagnostics">Deep diagnostics</string>
     <string name="network_diagnostics_summary">Attach trace, physical channels, registry events and the CarrierConfig diff.</string>
     <!-- Shown while a privileged write is in flight and before the read-back confirms it. -->

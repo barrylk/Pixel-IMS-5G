@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 
 // Ground — dark.
 val Void = Color(0xFF04070C)
-val Deck = Color(0xFF070D15)
+val Deck = Color(0xFF081220)
 val Hull = Color(0xFF0A1420)
 val HullHigh = Color(0xFF102030)
 
@@ -50,14 +50,24 @@ val PaperInk = Color(0xFF0A1622)
 val PaperInkDim = Color(0xFF445668)
 val PaperInkFaint = Color(0xFF74889B)
 
-// Panel fills and hairlines. Deliberately low alpha: the lit ground shows
-// through, which is what makes a panel read as glass rather than as paint.
-val FrostDark = Color(0x1292C4E0)
-val FrostDarkHigh = Color(0x1D92C4E0)
-val EdgeDark = Color(0x23A8D6F0)
-val EdgeDarkBright = Color(0x4DC4E8FF)
+/*
+ * Panel fills and hairlines.
+ *
+ * These were ported straight from a CSS prototype where the panels also had
+ * `backdrop-filter: blur()` behind them. Compose has no backdrop blur, and
+ * without it a 7% white fill over a near-black ground lands about ten levels
+ * above the background — outlines, not glass. The fill does all the work here,
+ * so it carries roughly three times the alpha the prototype used, with a
+ * brighter top edge standing in for the highlight the blur used to give.
+ */
+val FrostDark = Color(0x2E92C4E0)
+val FrostDarkHigh = Color(0x4592C4E0)
+val EdgeDark = Color(0x3DA8D6F0)
+val EdgeDarkBright = Color(0x73C4E8FF)
+val SheenDark = Color(0x59DCF0FF)
 
-val FrostLight = Color(0xF2FFFFFF)
+val FrostLight = Color(0xFFFFFFFF)
 val FrostLightHigh = Color(0xFFFFFFFF)
-val EdgeLight = Color(0x1F0A1622)
-val EdgeLightBright = Color(0x3D0A1622)
+val EdgeLight = Color(0x2E0A1622)
+val EdgeLightBright = Color(0x520A1622)
+val SheenLight = Color(0xB3FFFFFF)
