@@ -129,6 +129,16 @@ open class Moder {
             )
 }
 
+/**
+ * A deliberate pause inside a privileged sequence.
+ *
+ * The functions that call this are suspend so the compiler keeps them off the
+ * main thread. The pause itself blocks rather than using delay: these are
+ * multi-step modem writes, and a cancellation landing between two steps —
+ * navigating away mid-operation, say — would leave the radio half-configured.
+ */
+private fun settlePause(millis: Long) = Thread.sleep(millis)
+
 class CarrierModer(
     private val context: Context,
 ) : Moder() {
@@ -185,7 +195,7 @@ class CarrierModer(
             return res.getBoolean(volteConfigId)
         }
 
-    fun restoreAllManagedSettingsAndReboot() {
+    suspend fun restoreAllManagedSettingsAndReboot() {
         subscriptions.forEach { SubscriptionModer(context, it.subscriptionId).restoreGoogleDefaults() }
         context.getSharedPreferences("pixel_ims_5g_network_modes", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("github_updater", Context.MODE_PRIVATE).edit().clear().apply()
@@ -316,7 +326,7 @@ class SubscriptionModer(
         get() = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
             .getBoolean(EASY_MODE_PREFIX + subscriptionId, false)
 
-    fun setEasyMode(enabled: Boolean): EasyModeResult {
+    suspend fun setEasyMode(enabled: Boolean): EasyModeResult {
         val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
         if (!enabled) {
             prefs.edit().putBoolean(EASY_MODE_PREFIX + subscriptionId, false).apply()
@@ -342,7 +352,7 @@ class SubscriptionModer(
         }
         val caRequested = if (getTensorLteCaEnabled() == true) true else setTensorLteCaEnabled(true)
         restartIMSRegistration()
-        Thread.sleep(750)
+        settlePause(750)
         val caEnabled = getTensorLteCaEnabled()
         val applied = isVoLteConfigEnabled && (caEnabled != false || caRequested != false)
         prefs.edit().putBoolean(EASY_MODE_PREFIX + subscriptionId, applied).apply()
@@ -450,7 +460,7 @@ class SubscriptionModer(
         }
     }
 
-    fun undoLastChange(restoreBands: Boolean = true): Boolean {
+    suspend fun undoLastChange(restoreBands: Boolean = true): Boolean {
         val prefs = context.getSharedPreferences(NETWORK_PREFS, Context.MODE_PRIVATE)
         if (!prefs.contains(LAST_ACTION_PREFIX + subscriptionId)) return false
         val phone = this.loadCachedInterface { telephony }
@@ -861,7 +871,7 @@ class SubscriptionModer(
      * Opens every Android-side NR gate exposed by TelephonyManager and CarrierConfig. This cannot
      * make a cell broadcast NR/EN-DC, add unsupported RF bands, or bypass network authentication.
      */
-    fun applyRootForce(): RootForceResult {
+    suspend fun applyRootForce(): RootForceResult {
         check(PrivilegeManager.activeMode == PrivilegeMode.ROOT && PrivilegeManager.isRootReady()) {
             "Root Force requires the UID 0 backend"
         }
@@ -929,7 +939,7 @@ class SubscriptionModer(
                 it.putBoolean(CarrierConfigManager.KEY_SHOW_4G_FOR_LTE_DATA_ICON_BOOL, false)
             }
         }.onFailure { failedGates += "Carrier configuration" }
-        Thread.sleep(1_500)
+        settlePause(1_500)
         // CarrierConfig changes may cause Phone to recompute the carrier reason. Reassert every
         // readable reason after the broadcast, then verify the actual intersection below.
         ROOT_FORCE_REASONS.forEach { (reason, label) ->
@@ -945,7 +955,7 @@ class SubscriptionModer(
             .putBoolean(ROOT_FORCE_ACTIVE_PREFIX + subscriptionId, true)
             .putInt(PROFILE_MODE_PREFIX + subscriptionId, 0)
             .apply()
-        Thread.sleep(750)
+        settlePause(750)
         val report = getRootForceReport()
         val readableGatesOpen = report.gates.filter { it.mask != null }.all { it.lteAllowed && it.nrAllowed }
         return RootForceResult(
@@ -1171,7 +1181,7 @@ class SubscriptionModer(
         }
     }
 
-    fun restoreGoogleDefaults(): Boolean {
+    suspend fun restoreGoogleDefaults(): Boolean {
         return try {
             setBandSelectionInternal(intArrayOf(), intArrayOf())
             setRadioMode(0, recordChange = false)
@@ -1186,7 +1196,7 @@ class SubscriptionModer(
                 .remove(ORIGINAL_CA_PREFIX + subscriptionId)
                 .apply()
             clearLastChange()
-            Thread.sleep(500)
+            settlePause(500)
             restartIMSRegistration()
             true
         } catch (e: Exception) {
@@ -1320,7 +1330,7 @@ class SubscriptionModer(
      * This deliberately does not claim to replace Tensor cfg.db: Android 17 SELinux and verified
      * vendor partitions keep that operation root-only.
      */
-    fun applyShizukuRegionalCompatibility(): ShizukuRegionalResult {
+    suspend fun applyShizukuRegionalCompatibility(): ShizukuRegionalResult {
         check(PrivilegeManager.activeMode == PrivilegeMode.SHIZUKU) {
             "The Shizuku regional profile requires Shizuku mode"
         }
@@ -1360,7 +1370,7 @@ class SubscriptionModer(
             if (endcResult != TelephonyManager.ENABLE_NR_DUAL_CONNECTIVITY_SUCCESS) {
                 failed += "EN-DC control (result ${endcResult ?: "unreadable"})"
             } else {
-                Thread.sleep(500)
+                settlePause(500)
                 if (!runCatching { phone.isNrDualConnectivityEnabled(subscriptionId) }.getOrDefault(false)) {
                     failed += "EN-DC enablement did not persist"
                 }
@@ -1396,7 +1406,7 @@ class SubscriptionModer(
             }
         }.onFailure { failed += "Carrier configuration" }
 
-        Thread.sleep(1_250)
+        settlePause(1_250)
         listOf(
             TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER to "User network policy",
             TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER to "Carrier network policy",
@@ -1408,7 +1418,7 @@ class SubscriptionModer(
             }.getOrDefault(false)
             if (!accepted) failed += label
         }
-        Thread.sleep(500)
+        settlePause(500)
         val report = getRootForceReport()
         val relevantGates = report.gates.filter {
             it.reason == TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER ||
@@ -1455,7 +1465,7 @@ class SubscriptionModer(
     }
 
     /** Requests the Tensor modem CA node and verifies the value through the matching getter. */
-    fun setTensorLteCaEnabled(enabled: Boolean): Boolean? {
+    suspend fun setTensorLteCaEnabled(enabled: Boolean): Boolean? {
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
         return try {
@@ -1468,7 +1478,7 @@ class SubscriptionModer(
             if (!binder.transact(OEM_RIL_SET_RADIO_NODE_INT, data, reply, 0)) return false
             reply.readException()
             val accepted = reply.readBoolean()
-            Thread.sleep(300)
+            settlePause(300)
             val verified = getTensorLteCaEnabled()
             when {
                 verified == enabled -> true
