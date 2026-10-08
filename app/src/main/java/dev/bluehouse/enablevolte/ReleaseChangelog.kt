@@ -21,6 +21,28 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.2.0" ->
+                InstalledChangelog(
+                    version = "2.2.0",
+                    items =
+                        listOf(
+                            ChangelogItem(
+                                title = "Real liquid glass",
+                                detail = "The panels and the floating navigation bar now blur the lit ground behind them for real, in both light and dark themes, instead of faking frost with a flat fill. Where a device cannot blur, a solid tint keeps everything legible.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Root shown on Home",
+                                detail = "When the device is rooted — a detected su manager such as Magisk, KernelSU or APatch, a su binary, or the app's own connected root service — the Home screen now says so and points at the full set of root-only fixes.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "The 5G regional patch is easy to find",
+                                detail = "The systemless Tensor modem compatibility patch now has its own entry on the Home screen rather than being buried inside band selection.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                        ),
+                )
             "2.1.0" ->
                 InstalledChangelog(
                     version = "2.1.0",

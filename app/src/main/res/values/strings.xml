@@ -439,4 +439,15 @@
     <string name="modem_patch_credit">Wildcard/PTCRB Tensor cfg.db mapping research credited to the Pixel Modem Fix and Displax modem-fix projects. Pixel IMS 5G independently validates and patches the current firmware database.</string>
     <string name="license">Open-source license</string>
     <string name="unofficial_notice">Pixel IMS 5G is an unofficial community project. It is not affiliated with Google, mobile carriers, Facebook, or GitHub.</string>
+
+    <!-- Root detection surfaced on the Home screen -->
+    <string name="root_detected_title">Root access detected</string>
+    <string name="root_detected_generic">This device is rooted</string>
+    <string name="root_badge">ROOTED</string>
+    <string name="root_detected_active">Pixel IMS 5G is running with a UID 0 root service, so every modem and carrier-config fix — including the regional modem patch — is available.</string>
+    <string name="root_detected_hint">Running in Shizuku mode. Pick Root the next time the app asks for an access mode to unlock the Tensor modem patch and the other root-only fixes.</string>
+
+    <!-- Regional modem patch, surfaced on Home so it is easy to find -->
+    <string name="regional_patch_home_title">5G regional modem patch</string>
+    <string name="regional_patch_home_subtitle">Open the systemless Tensor cfg.db compatibility patch for regional 5G. Requires Root + Magisk.</string>
 </resources>

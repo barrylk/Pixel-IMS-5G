@@ -15,52 +15,98 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 /**
- * The page ground, lit from above.
+ * The blur source the glass surfaces sample.
  *
- * The gradient is not decoration. Panels are translucent, so whatever is behind
- * them decides whether they read as objects or as nothing at all — a flat
- * near-black ground is what made the first attempt at this look like outlines
- * on a void.
+ * Every pane in the app blurs the same thing — the lit ground drawn by
+ * [AppBackdrop] — so there is one [HazeState] for the whole screen, handed down
+ * here. It is nullable so a [Panel] rendered outside the backdrop (a @Preview,
+ * a unit of UI lifted into isolation) still draws; it simply falls back to its
+ * tint with no blur behind it.
+ */
+val LocalGlassHaze = staticCompositionLocalOf<HazeState?> { null }
+
+/**
+ * The page ground, lit from above — and the one surface everything else blurs.
+ *
+ * The gradient is not decoration. Panels are translucent glass, so whatever is
+ * behind them decides whether they read as objects or as nothing at all. The
+ * ground is marked as the haze source and drawn first; the app, with its glass
+ * panels and floating navigation bar, is drawn over it and samples it.
  */
 @Composable
 fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
     val colors = MaterialTheme.colorScheme
     val inst = LocalInstrument.current
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.background)
-            .background(
-                Brush.verticalGradient(
-                    0.0f to inst.glow.copy(alpha = if (inst.isDark) 0.20f else 0.10f),
-                    0.28f to inst.glow.copy(alpha = if (inst.isDark) 0.05f else 0.025f),
-                    0.60f to Color.Transparent,
-                    1.0f to Color.Black.copy(alpha = if (inst.isDark) 0.30f else 0f),
-                ),
-            ),
-    ) {
-        CompositionLocalProvider(LocalContentColor provides colors.onBackground) {
-            content()
+    val hazeState = rememberHazeState()
+    Box(modifier = Modifier.fillMaxSize()) {
+        val scope = this
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(colors.background)
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to inst.glow.copy(alpha = if (inst.isDark) 0.20f else 0.10f),
+                        0.28f to inst.glow.copy(alpha = if (inst.isDark) 0.05f else 0.025f),
+                        0.60f to Color.Transparent,
+                        1.0f to Color.Black.copy(alpha = if (inst.isDark) 0.30f else 0f),
+                    ),
+                )
+                .hazeSource(state = hazeState),
+        )
+        CompositionLocalProvider(
+            LocalContentColor provides colors.onBackground,
+            LocalGlassHaze provides hazeState,
+        ) {
+            scope.content()
         }
     }
 }
 
 /**
- * A frosted panel.
+ * The glass recipe, shared by every pane.
  *
- * Three things make this read as glass without a backdrop blur, which Compose
- * cannot do: a fill bright enough to separate from the ground on its own, a
- * gradient running top-to-bottom so the surface has a direction, and a one-pixel
- * sheen along the top edge where a real pane would catch the light.
+ * A thin frost tint over the real blur, plus a touch of grain so a flat
+ * gradient does not read as plastic. When no hardware blur is available the
+ * [HazeStyle.fallbackTint] paints an opaque container colour instead, so a pane
+ * stays legible rather than dissolving into the ground.
+ */
+@Composable
+fun glassHazeStyle(blurRadius: Dp = 24.dp): HazeStyle {
+    val inst = LocalInstrument.current
+    val colors = MaterialTheme.colorScheme
+    return HazeStyle(
+        backgroundColor = colors.surface,
+        tints = listOf(HazeTint(if (inst.isDark) inst.frostHigh else inst.frost)),
+        blurRadius = blurRadius,
+        noiseFactor = if (inst.isDark) 0.04f else 0.02f,
+        fallbackTint = HazeTint(colors.surfaceContainerHigh),
+    )
+}
+
+/**
+ * A frosted glass panel.
+ *
+ * The blur does the heavy lifting now: the pane samples the lit ground, blurs
+ * it, and lays a thin frost film and a one-pixel top sheen over it, with a
+ * hairline edge where a real pane would meet the light.
  */
 @Composable
 fun Panel(
@@ -71,12 +117,19 @@ fun Panel(
     val inst = LocalInstrument.current
     val colors = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.large
+    val haze = LocalGlassHaze.current
+    val style = glassHazeStyle()
     val fill = Brush.verticalGradient(listOf(inst.frostHigh, inst.frost))
     val border = BorderStroke(1.dp, inst.edge)
 
     @Composable
     fun Body() {
-        Box(Modifier.background(fill, shape).clip(shape)) {
+        Box(
+            Modifier
+                .clip(shape)
+                .then(if (haze != null) Modifier.hazeEffect(state = haze, style = style) else Modifier)
+                .background(fill),
+        ) {
             content()
             Box(
                 Modifier

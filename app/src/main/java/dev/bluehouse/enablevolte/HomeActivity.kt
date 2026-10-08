@@ -87,8 +87,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dev.bluehouse.enablevolte.components.AppBackdrop
 import dev.bluehouse.enablevolte.components.InfoDialog
+import dev.bluehouse.enablevolte.components.LocalGlassHaze
 import dev.bluehouse.enablevolte.components.OnLifecycleEvent
 import dev.bluehouse.enablevolte.components.WhatsNewDialog
+import dev.bluehouse.enablevolte.components.glassHazeStyle
 import dev.bluehouse.enablevolte.pages.About
 import dev.bluehouse.enablevolte.pages.Bands
 import dev.bluehouse.enablevolte.pages.Config
@@ -103,6 +105,7 @@ import dev.bluehouse.enablevolte.pages.NetworkPage
 import dev.bluehouse.enablevolte.pages.SetupPage
 import dev.bluehouse.enablevolte.ui.theme.EnableVoLTETheme
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
+import dev.chrisbanes.haze.hazeEffect
 import java.lang.IllegalStateException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -519,9 +522,18 @@ fun PixelIMSApp(
                         tonalElevation = 0.dp,
                         shadowElevation = 12.dp,
                     ) {
+                        val navHaze = LocalGlassHaze.current
+                        val navGlass = glassHazeStyle()
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .then(
+                                    if (navHaze != null) {
+                                        Modifier.hazeEffect(state = navHaze, style = navGlass)
+                                    } else {
+                                        Modifier
+                                    },
+                                )
                                 .background(
                                     Brush.verticalGradient(listOf(inst.frostHigh, inst.frost)),
                                     RoundedCornerShape(22.dp),

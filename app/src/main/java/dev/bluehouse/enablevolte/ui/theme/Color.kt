@@ -53,21 +53,23 @@ val PaperInkFaint = Color(0xFF74889B)
 /*
  * Panel fills and hairlines.
  *
- * These were ported straight from a CSS prototype where the panels also had
- * `backdrop-filter: blur()` behind them. Compose has no backdrop blur, and
- * without it a 7% white fill over a near-black ground lands about ten levels
- * above the background — outlines, not glass. The fill does all the work here,
- * so it carries roughly three times the alpha the prototype used, with a
- * brighter top edge standing in for the highlight the blur used to give.
+ * These were ported from a CSS prototype where the panels had
+ * `backdrop-filter: blur()` behind them. 2.0 had to fake that with heavy alpha
+ * fills because Compose could not blur a backdrop; 2.2 restores the real thing
+ * with the haze library, so the fills are tints *over* a genuine blur again
+ * rather than a substitute for it. The frost therefore steps back to a thin,
+ * glass-like film in both themes — light especially, where an opaque white fill
+ * used to hide the blur entirely — and the lit top edge stays to catch the
+ * light the way a real pane would.
  */
-val FrostDark = Color(0x2E92C4E0)
-val FrostDarkHigh = Color(0x4592C4E0)
+val FrostDark = Color(0x2692C4E0)
+val FrostDarkHigh = Color(0x3C92C4E0)
 val EdgeDark = Color(0x3DA8D6F0)
 val EdgeDarkBright = Color(0x73C4E8FF)
 val SheenDark = Color(0x59DCF0FF)
 
-val FrostLight = Color(0xFFFFFFFF)
-val FrostLightHigh = Color(0xFFFFFFFF)
+val FrostLight = Color(0x59FFFFFF)
+val FrostLightHigh = Color(0x80FFFFFF)
 val EdgeLight = Color(0x2E0A1622)
 val EdgeLightBright = Color(0x520A1622)
 val SheenLight = Color(0xB3FFFFFF)

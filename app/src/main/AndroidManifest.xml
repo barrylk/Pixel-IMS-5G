@@ -17,6 +17,14 @@
         <package android:name="app.grapheneos.apps" />
         <package android:name="app.vanadium.browser" />
         <package android:name="app.vanadium.webview" />
+        <!-- Visibility of installed su managers, so the Home screen can report
+             that the device is rooted. The app only reads whether these are
+             present; it never talks to them. -->
+        <package android:name="com.topjohnwu.magisk" />
+        <package android:name="io.github.huskydg.magisk" />
+        <package android:name="io.github.vvb2060.magisk" />
+        <package android:name="me.weishu.kernelsu" />
+        <package android:name="me.bmax.apatch" />
     </queries>
 
     <instrumentation

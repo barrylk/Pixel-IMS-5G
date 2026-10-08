@@ -20,10 +20,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.QuestionMark
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -35,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,12 +53,17 @@ import dev.bluehouse.enablevolte.CheckStatus
 import dev.bluehouse.enablevolte.FixAction
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.ReadinessCheck
+import dev.bluehouse.enablevolte.RootDetector
+import dev.bluehouse.enablevolte.RootStatus
 import dev.bluehouse.enablevolte.SetupState
 import dev.bluehouse.enablevolte.SetupViewModel
 import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PanelGroup
+import dev.bluehouse.enablevolte.components.PremiumActionRow
+import dev.bluehouse.enablevolte.components.PremiumStatusChip
 import dev.bluehouse.enablevolte.components.RowDivider
 import dev.bluehouse.enablevolte.components.SignalChip
+import dev.bluehouse.enablevolte.components.StatusTone
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 import dev.bluehouse.enablevolte.ui.theme.ReadoutHuge
 import dev.bluehouse.enablevolte.uniqueName
@@ -78,9 +86,16 @@ fun SetupPage(
     var slot by rememberSaveable { mutableIntStateOf(0) }
     val subscription = subscriptions.getOrNull(slot)
     val scrollState = rememberScrollState()
+    val rootStatus = remember { RootDetector.detect(context) }
 
     if (subscription == null) {
-        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+        Column(
+            Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (rootStatus.rooted) {
+                RootStatusPanel(rootStatus)
+            }
             Panel(Modifier.fillMaxWidth()) {
                 Text(
                     stringResource(R.string.controls_no_sim),
@@ -155,8 +170,19 @@ fun SetupPage(
             }
         }
 
+        if (rootStatus.rooted) {
+            RootStatusPanel(rootStatus)
+        }
+
         PanelGroup {
-            dev.bluehouse.enablevolte.components.PremiumActionRow(
+            PremiumActionRow(
+                title = stringResource(R.string.regional_patch_home_title),
+                subtitle = stringResource(R.string.regional_patch_home_subtitle),
+                icon = Icons.Filled.CellTower,
+                onClick = { navController.navigate("bands/${subscription.subscriptionId}") },
+            )
+            RowDivider()
+            PremiumActionRow(
                 title = stringResource(R.string.setup_expert),
                 subtitle = stringResource(R.string.setup_expert_summary),
                 icon = Icons.Filled.PriorityHigh,
@@ -320,6 +346,55 @@ private fun CheckRow(
                     Text(check.fixLabel, style = MaterialTheme.typography.labelLarge)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Root, surfaced on the screen the app opens on.
+ *
+ * Detection is passive — installed su managers, a su binary on a readable path,
+ * the build tags, or the app's own connected UID 0 service. The card states the
+ * fact; when the app is not already running as root it points at the switch
+ * that would put it there.
+ */
+@Composable
+private fun RootStatusPanel(status: RootStatus) {
+    Panel(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.Security,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.root_detected_title),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        status.managerName ?: stringResource(R.string.root_detected_generic),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                PremiumStatusChip(
+                    label = stringResource(R.string.root_badge),
+                    tone = if (status.serviceActive) StatusTone.SUCCESS else StatusTone.WARNING,
+                )
+            }
+            Text(
+                if (status.serviceActive) {
+                    stringResource(R.string.root_detected_active)
+                } else {
+                    stringResource(R.string.root_detected_hint)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

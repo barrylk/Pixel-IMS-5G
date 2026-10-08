@@ -13,8 +13,8 @@ android {
         // Every Tensor Pixel (Pixel 6 and newer) launched on Android 12 / API 31 or later.
         minSdk 31
         targetSdk 36
-        versionCode 31
-        versionName "2.1.0"
+        versionCode 32
+        versionName "2.2.0"
 
         vectorDrawables {
             useSupportLibrary true
@@ -77,6 +77,12 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-core'
     // R8 strips the unused icons from this artifact in release builds.
     implementation 'androidx.compose.material:material-icons-extended'
+
+    // Real backdrop blur for the liquid-glass panels and navigation bar. The
+    // 1.7.x line targets Compose 1.9.x, matching the BOM pinned above; on the
+    // rare surface where a hardware blur is unavailable it paints a solid tint
+    // instead, so the panels never regress to the faint fills 2.0 shipped.
+    implementation 'dev.chrisbanes.haze:haze:1.7.3'
 
     def shizuku_version = "13.1.5"
     implementation "dev.rikka.shizuku:api:$shizuku_version"
