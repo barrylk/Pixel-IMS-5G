@@ -49,6 +49,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 const val TAG = "HomeActivity:Home"
 
@@ -68,16 +69,26 @@ fun Home(navController: NavController) {
     var imsIssues by remember { mutableStateOf(listOf<SubscriptionModer.ImsIssue>()) }
     val scope = rememberCoroutineScope()
 
-    fun loadFlags() {
+    // Every value here is a binder round trip (diagnoseIms is several per SIM),
+    // so it is read off the main thread and published in one step.
+    suspend fun loadFlags() {
+        val loaded = withContext(Dispatchers.IO) {
+            runCatching {
+                val subs = carrierModer.subscriptions
+                val ims = carrierModer.deviceSupportsIMS
+                val diagnoses = if (subs.isNotEmpty() && ims) {
+                    subs.map { SubscriptionModer(context, it.subscriptionId).diagnoseIms() }
+                } else {
+                    emptyList()
+                }
+                Triple(subs, ims, diagnoses)
+            }.getOrNull()
+        } ?: return
         shizukuGranted = true
-        subscriptions = carrierModer.subscriptions
-        deviceIMSEnabled = carrierModer.deviceSupportsIMS
-
-        if (subscriptions.isNotEmpty() && deviceIMSEnabled) {
-            val diagnoses = subscriptions.map { SubscriptionModer(context, it.subscriptionId).diagnoseIms() }
-            isIMSRegistered = diagnoses.map { it.registered }
-            imsIssues = diagnoses.map { it.issue }
-        }
+        subscriptions = loaded.first
+        deviceIMSEnabled = loaded.second
+        isIMSRegistered = loaded.third.map { it.registered }
+        imsIssues = loaded.third.map { it.issue }
     }
 
     LaunchedEffect(Unit) {
@@ -101,11 +112,19 @@ fun Home(navController: NavController) {
                 }
                 ShizukuStatus.NOT_GRANTED -> {
                     shizukuEnabled = true
-                    Shizuku.addRequestPermissionResultListener { _, grantResult ->
-                        if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                            loadFlags()
+                    // Wait for the answer here instead of registering a listener that
+                    // outlives the page; leaving the page cancels the wait.
+                    val granted = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                        val listener = object : Shizuku.OnRequestPermissionResultListener {
+                            override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
+                                Shizuku.removeRequestPermissionResultListener(this)
+                                if (cont.isActive) cont.resume(grantResult == PackageManager.PERMISSION_GRANTED)
+                            }
                         }
+                        Shizuku.addRequestPermissionResultListener(listener)
+                        cont.invokeOnCancellation { Shizuku.removeRequestPermissionResultListener(listener) }
                     }
+                    if (granted) loadFlags()
                 }
                 else -> {
                     shizukuEnabled = false

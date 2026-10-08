@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 
 /**
  * Tokens Material's own scheme has no slot for.
@@ -37,6 +37,15 @@ data class InstrumentColors(
     val pulse: Color,
     val glow: Color,
     val sheen: Color,
+    /** The highlight where light enters a pane, at its top-leading corner. */
+    val specular: Color,
+    /** The coloured edge light at a pane's lower-trailing rim. */
+    val caustic: Color,
+    /** The faint shade where light leaves a pane. */
+    val shade: Color,
+    /** Fill for bars that content scrolls beneath, where more opacity keeps text legible. */
+    val scrim: Color,
+    val pools: List<Color>,
     val isDark: Boolean,
 )
 
@@ -53,6 +62,11 @@ private val DarkInstrument =
         pulse = Pulse,
         glow = Signal,
         sheen = SheenDark,
+        specular = SpecularDark,
+        caustic = CausticDark,
+        shade = ShadeDark,
+        scrim = ScrimDark,
+        pools = listOf(PoolCyanDark, PoolVioletDark, PoolEmberDark),
         isDark = true,
     )
 
@@ -71,6 +85,11 @@ private val LightInstrument =
         pulse = Pulse,
         glow = SignalDeep,
         sheen = SheenLight,
+        specular = SpecularLight,
+        caustic = CausticLight,
+        shade = ShadeLight,
+        scrim = ScrimLight,
+        pools = listOf(PoolCyanLight, PoolVioletLight, PoolEmberLight),
         isDark = false,
     )
 
@@ -92,6 +111,8 @@ private val DarkColorScheme =
         surfaceContainerHighest = HullHigh,
         surfaceVariant = HullHigh,
         onSurfaceVariant = InkDim,
+        secondaryContainer = Color(0x333CE0FF),
+        onSecondaryContainer = Ink,
         outline = EdgeDark,
         outlineVariant = EdgeDark,
         error = Poor,
@@ -116,6 +137,8 @@ private val LightColorScheme =
         surfaceContainerHighest = PaperHullHigh,
         surfaceVariant = PaperHullHigh,
         onSurfaceVariant = PaperInkDim,
+        secondaryContainer = Color(0x290068A8),
+        onSecondaryContainer = PaperInk,
         outline = EdgeLight,
         outlineVariant = EdgeLight,
         error = PoorDeep,
@@ -130,19 +153,24 @@ private val LightColorScheme =
  */
 private val InstrumentShapes =
     Shapes(
-        extraSmall = RoundedCornerShape(10.dp),
-        small = RoundedCornerShape(14.dp),
-        medium = RoundedCornerShape(18.dp),
-        large = RoundedCornerShape(22.dp),
-        extraLarge = RoundedCornerShape(26.dp),
+        extraSmall = RoundedCornerShape(12.dp),
+        small = RoundedCornerShape(16.dp),
+        medium = RoundedCornerShape(20.dp),
+        large = RoundedCornerShape(26.dp),
+        extraLarge = RoundedCornerShape(32.dp),
     )
 
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun EnableVoLTETheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit,
 ) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
     // Dynamic colour stays off: the ramp means something, and a wallpaper does
     // not know what a good RSRP looks like.
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -154,8 +182,11 @@ fun EnableVoLTETheme(
             window.statusBarColor = Color.Transparent.toArgb()
             window.navigationBarColor = Color.Transparent.toArgb()
             window.isNavigationBarContrastEnforced = false
-            ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars = !darkTheme
-            ViewCompat.getWindowInsetsController(view)?.isAppearanceLightNavigationBars = !darkTheme
+            // Re-run on every in-app theme change, not only on system changes.
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !darkTheme
+                isAppearanceLightNavigationBars = !darkTheme
+            }
         }
     }
 

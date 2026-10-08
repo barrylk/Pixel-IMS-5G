@@ -491,6 +491,37 @@ class PrivilegedService : RootService() {
             }
         }
 
+        private fun detectModuleManager(): ModuleManager? = when {
+            findExecutable(MAGISK_CANDIDATES) != null -> ModuleManager.MAGISK
+            File(KSUD).canExecute() -> ModuleManager.KERNELSU
+            File(APD).canExecute() -> ModuleManager.APATCH
+            else -> null
+        }
+
+        /** The domain this root service runs in, e.g. `magisk` or `su`. */
+        private fun currentSelinuxDomain(): String? =
+            runCatching { File("/proc/self/attr/current").readText().trim().trimEnd('\u0000') }
+                .getOrNull()
+                ?.split(':')
+                ?.getOrNull(2)
+                ?.takeIf { it.matches(Regex("[a-z0-9_]+")) }
+
+        /**
+         * SQLiteDatabase reads a Settings.Global flag through the app's content
+         * resolver the first time it opens anything. This service has no app
+         * identity, so on some builds that lookup throws "Unable to find app for
+         * caller" and the patch never installs (issue #15). Initialising the
+         * flags with no value marks them read and skips the lookup.
+         */
+        private fun disableSqliteGlobalSettingsLookup() {
+            val walFlags = "android.database.sqlite.SQLiteCompatibilityWalFlags"
+            runCatching {
+                Class.forName(walFlags).getMethod("init", String::class.java).invoke(null, null)
+            }.recoverCatching {
+                HiddenApiBypass.invoke(Class.forName(walFlags), null, "init", null)
+            }.onFailure { Log.w(TAG, "Unable to pre-initialise SQLite compatibility flags", it) }
+        }
+
         private fun runCommand(vararg command: String): CommandResult =
             runCatching {
                 val process = ProcessBuilder(*command).redirectErrorStream(true).start()
@@ -503,21 +534,21 @@ class PrivilegedService : RootService() {
             check(device in TENSOR_DEVICES) {
                 "Unsupported device '$device'. This patch is limited to known Google Tensor Pixels."
             }
-            check(findExecutable(MAGISK_CANDIDATES) != null) {
-                "Magisk was not detected. The modem database patch is unavailable with Shizuku."
-            }
+            val manager = detectModuleManager()
+                ?: error("No module manager (Magisk, KernelSU or APatch) was detected. The modem database patch needs one.")
             val source = File(REGIONAL_SOURCE_DB)
             check(source.isFile) { "The Tensor carrier database was not found at $REGIONAL_SOURCE_DB." }
 
-            val policy = findExecutable(MAGISK_POLICY_CANDIDATES)
-                ?: error("magiskpolicy was not found; the stock carrier database cannot be read safely.")
-            val policyResult = runCommand(
-                policy,
-                "--live",
-                "allow magisk vendor_fw_file file { getattr open read map }",
-            )
-            check(policyResult.exitCode == 0) {
-                "SELinux refused temporary read access to the stock carrier database."
+            // Each manager runs this service in its own SELinux domain and ships its
+            // own live-policy tool, so the read rule is written for whichever is here.
+            val readRule = "allow ${currentSelinuxDomain() ?: manager.defaultDomain} vendor_fw_file file { getattr open read map }"
+            val policyApplied = when (manager) {
+                ModuleManager.KERNELSU -> runCommand(KSUD, "sepolicy", "patch", readRule).exitCode == 0
+                else -> findExecutable(MAGISK_POLICY_CANDIDATES)?.let { runCommand(it, "--live", readRule).exitCode == 0 } == true
+            }
+            if (!policyApplied) Log.w(TAG, "Live SELinux rule not applied for ${manager.label}; trying the read anyway")
+            check(source.canRead()) {
+                "SELinux refused read access to the stock carrier database under ${manager.label}."
             }
 
             val workDir = File(cacheDirectory(), "regional-modem-patch").apply {
@@ -567,15 +598,19 @@ class PrivilegedService : RootService() {
             }
             stagedDatabase.copyTo(targetDatabase, overwrite = true)
 
-            check(
-                runCommand(
-                    "/system/bin/chcon",
-                    "-R",
-                    "u:object_r:magisk_file:s0",
-                    pendingModule.path,
-                ).exitCode == 0,
-            ) {
-                "Unable to assign the Magisk module SELinux label."
+            // magisk_file only exists in Magisk's policy; KernelSU and APatch label
+            // their module tree themselves.
+            if (manager == ModuleManager.MAGISK) {
+                check(
+                    runCommand(
+                        "/system/bin/chcon",
+                        "-R",
+                        "u:object_r:magisk_file:s0",
+                        pendingModule.path,
+                    ).exitCode == 0,
+                ) {
+                    "Unable to assign the Magisk module SELinux label."
+                }
             }
             check(runCommand("/system/bin/chmod", "0755", File(pendingModule, "service.sh").path).exitCode == 0) {
                 "Unable to make the module boot service executable."
@@ -603,11 +638,17 @@ class PrivilegedService : RootService() {
 
             return regionalPatchStatus(
                 rebootRequired = true,
-                message = "Validated systemless modem patch installed. Reboot to load it.",
+                message = "Validated systemless modem patch installed. Reboot to load it." +
+                    if (manager == ModuleManager.KERNELSU) {
+                        " KernelSU needs a mounting metamodule (for example mountify or meta-overlayfs) to apply it."
+                    } else {
+                        ""
+                    },
             ).toString()
         }
 
         private fun patchAndValidateCarrierDatabase(databaseFile: File) {
+            disableSqliteGlobalSettingsLookup()
             val database = SQLiteDatabase.openDatabase(
                 databaseFile.path,
                 null,
@@ -679,7 +720,8 @@ class PrivilegedService : RootService() {
             val pendingReboot = File(module, ".pending_reboot").isFile
             return JSONObject()
                 .put("supported", device in TENSOR_DEVICES)
-                .put("magiskAvailable", findExecutable(MAGISK_CANDIDATES) != null)
+                .put("magiskAvailable", detectModuleManager() != null)
+                .put("rootManager", detectModuleManager()?.label.orEmpty())
                 .put("sourceAvailable", File(REGIONAL_SOURCE_DB).isFile)
                 .put("installed", database.isFile)
                 .put("removalPending", removalPending)
@@ -695,7 +737,8 @@ class PrivilegedService : RootService() {
             val module = File(REGIONAL_MODULE_DIR)
             return when {
                 device !in TENSOR_DEVICES -> "This device is not in the validated Tensor Pixel list."
-                findExecutable(MAGISK_CANDIDATES) == null -> "Magisk is required; Shizuku cannot overlay vendor firmware."
+                detectModuleManager() == null ->
+                    "A module manager (Magisk, KernelSU or APatch) is required; Shizuku cannot overlay vendor firmware."
                 !File(REGIONAL_SOURCE_DB).isFile -> "The Tensor carrier database was not found on this firmware."
                 File(module, "remove").isFile -> "Removal is scheduled. Reboot to restore the stock modem database."
                 File(module, ".pending_reboot").isFile -> "Patch installed. Reboot is required before it becomes active."
@@ -762,7 +805,10 @@ class PrivilegedService : RootService() {
             "/system_ext/bin/magiskpolicy",
             "/sbin/magiskpolicy",
             "/data/adb/magisk/magiskpolicy",
+            "/data/adb/ap/bin/magiskpolicy",
         )
+        private const val KSUD = "/data/adb/ksud"
+        private const val APD = "/data/adb/apd"
         private val TENSOR_DEVICES = setOf(
             "oriole", "raven", "bluejay",
             "panther", "cheetah", "lynx", "tangorpro", "felix",
@@ -897,4 +943,11 @@ class PrivilegedService : RootService() {
             }.joinToString("\n")
         }
     }
+}
+
+/** The root solutions that can mount a systemless module from /data/adb/modules. */
+private enum class ModuleManager(val label: String, val defaultDomain: String) {
+    MAGISK("Magisk", "magisk"),
+    KERNELSU("KernelSU", "su"),
+    APATCH("APatch", "su"),
 }

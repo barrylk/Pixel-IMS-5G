@@ -318,6 +318,12 @@ private fun AttachTracePage(subscriptions: List<SubscriptionInfo>) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedSubId by rememberSaveable { mutableStateOf(subscriptions.firstOrNull()?.subscriptionId ?: -1) }
+    // Subscriptions can arrive (or change) after this page opens; never stay pinned to a missing SIM.
+    LaunchedEffect(subscriptions) {
+        if (subscriptions.none { it.subscriptionId == selectedSubId }) {
+            selectedSubId = subscriptions.firstOrNull()?.subscriptionId ?: -1
+        }
+    }
     var radio by remember { mutableStateOf<SubscriptionModer.RadioDiagnostics?>(null) }
     var report by remember { mutableStateOf<SubscriptionModer.RootForceReport?>(null) }
     var registryState by remember { mutableStateOf("Waiting for monitoring permission") }
@@ -555,6 +561,12 @@ private data class ConfigGate(
 private fun CarrierConfigDiffPage(subscriptions: List<SubscriptionInfo>) {
     val context = LocalContext.current
     var selectedSubId by rememberSaveable { mutableStateOf(subscriptions.firstOrNull()?.subscriptionId ?: -1) }
+    // Subscriptions can arrive (or change) after this page opens; never stay pinned to a missing SIM.
+    LaunchedEffect(subscriptions) {
+        if (subscriptions.none { it.subscriptionId == selectedSubId }) {
+            selectedSubId = subscriptions.firstOrNull()?.subscriptionId ?: -1
+        }
+    }
     var rows by remember { mutableStateOf(emptyList<ConfigGate>()) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -667,6 +679,12 @@ private fun carrierConfigRows(context: Context, subId: Int): List<ConfigGate> {
 private fun NrCapabilitiesPage(subscriptions: List<SubscriptionInfo>) {
     val context = LocalContext.current
     var selectedSubId by rememberSaveable { mutableStateOf(subscriptions.firstOrNull()?.subscriptionId ?: -1) }
+    // Subscriptions can arrive (or change) after this page opens; never stay pinned to a missing SIM.
+    LaunchedEffect(subscriptions) {
+        if (subscriptions.none { it.subscriptionId == selectedSubId }) {
+            selectedSubId = subscriptions.firstOrNull()?.subscriptionId ?: -1
+        }
+    }
     var radio by remember { mutableStateOf<SubscriptionModer.RadioDiagnostics?>(null) }
     var gates by remember { mutableStateOf<SubscriptionModer.RootForceReport?>(null) }
     var endcControl by remember { mutableStateOf<Boolean?>(null) }

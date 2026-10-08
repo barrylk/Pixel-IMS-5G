@@ -18,11 +18,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,15 +30,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Science
@@ -49,17 +52,16 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,12 +71,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -86,9 +88,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dev.bluehouse.enablevolte.components.AppBackdrop
+import dev.bluehouse.enablevolte.components.GlassDepth
 import dev.bluehouse.enablevolte.components.InfoDialog
 import dev.bluehouse.enablevolte.components.OnLifecycleEvent
 import dev.bluehouse.enablevolte.components.WhatsNewDialog
+import dev.bluehouse.enablevolte.components.liquidGlass
 import dev.bluehouse.enablevolte.pages.About
 import dev.bluehouse.enablevolte.pages.Bands
 import dev.bluehouse.enablevolte.pages.Config
@@ -103,12 +107,13 @@ import dev.bluehouse.enablevolte.pages.NetworkPage
 import dev.bluehouse.enablevolte.pages.SetupPage
 import dev.bluehouse.enablevolte.ui.theme.EnableVoLTETheme
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
-import java.lang.IllegalStateException
+import dev.bluehouse.enablevolte.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
+import java.lang.IllegalStateException
 
 data class Screen(
     val route: String,
@@ -142,9 +147,15 @@ class HomeActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            EnableVoLTETheme {
+            var themeMode by remember { mutableStateOf(ThemeMode.load(this@HomeActivity)) }
+            EnableVoLTETheme(themeMode = themeMode) {
                 AppBackdrop {
                     PixelIMSApp(
+                        themeMode = themeMode,
+                        onThemeModeChange = {
+                            themeMode = it
+                            ThemeMode.save(this@HomeActivity, it)
+                        },
                         startDestination = if (intent.getBooleanExtra(EXTRA_OPEN_UPDATES, false)) {
                             "home/about"
                         } else {
@@ -231,6 +242,8 @@ class HomeActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PixelIMSApp(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    onThemeModeChange: (ThemeMode) -> Unit = {},
     startDestination: String = "home",
     navigationRequest: String? = null,
     onNavigationRequestHandled: () -> Unit = {},
@@ -247,6 +260,10 @@ fun PixelIMSApp(
     }
     var privilegeError by rememberSaveable { mutableStateOf<String?>(null) }
     var privilegeConnecting by rememberSaveable { mutableStateOf(false) }
+
+    // Observable, unlike PrivilegeManager.isRootReady(): the regional patch card
+    // on the home screen appears only once root is detected and granted.
+    var rootGranted by remember { mutableStateOf(PrivilegeManager.isRootReady()) }
     val osDistribution = remember { OsDistributionDetector.detect(context) }
     var showShizukuRegionalWarning by rememberSaveable { mutableStateOf(false) }
     var whatsNew by remember { mutableStateOf(UpdateManager.changelogToShow(context)) }
@@ -281,6 +298,7 @@ fun PixelIMSApp(
                 context.mainExecutor.execute {
                     privilegeConnecting = false
                     privilegeError = error
+                    rootGranted = ready && PrivilegeManager.isRootReady()
                     if (ready) {
                         runCatching {
                             subscriptions = carrierModer.subscriptions
@@ -291,32 +309,43 @@ fun PixelIMSApp(
             return
         }
         if (mode == PrivilegeMode.ROOT) {
+            rootGranted = true
             runCatching {
                 subscriptions = carrierModer.subscriptions
             }.onFailure { privilegeError = it.message ?: "Unable to read telephony services as root" }
             return
         }
-        val shizukuStatus = checkShizukuPermission(0)
+        rootGranted = false
+        // checkShizukuPermission throws IllegalStateException when the binder dies
+        // between its own checks, so it belongs inside the try.
         try {
-            when (shizukuStatus) {
+            when (checkShizukuPermission(0)) {
                 ShizukuStatus.GRANTED -> {
                     Log.d(dev.bluehouse.enablevolte.pages.TAG, "Shizuku granted")
                     subscriptions = carrierModer.subscriptions
                 }
-                ShizukuStatus.NOT_GRANTED -> {
-                    Shizuku.addRequestPermissionResultListener { _, grantResult ->
-                        if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                            Log.d(dev.bluehouse.enablevolte.pages.TAG, "Shizuku granted")
-                            subscriptions = carrierModer.subscriptions
-                        }
-                    }
-                }
+                // The grant arrives through shizukuPermissionListener below.
+                ShizukuStatus.NOT_GRANTED -> Unit
                 else -> {
                     subscriptions = listOf()
                 }
             }
         } catch (_: IllegalStateException) {
         }
+    }
+
+    // One listener for the life of the screen. It used to be added on every
+    // load and every refresh tap, and never removed, so each grant re-read the
+    // subscriptions once per stale listener.
+    DisposableEffect(Unit) {
+        val listener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+            if (grantResult == PackageManager.PERMISSION_GRANTED && PrivilegeManager.activeMode == PrivilegeMode.SHIZUKU) {
+                Log.d(dev.bluehouse.enablevolte.pages.TAG, "Shizuku granted")
+                runCatching { subscriptions = carrierModer.subscriptions }
+            }
+        }
+        Shizuku.addRequestPermissionResultListener(listener)
+        onDispose { Shizuku.removeRequestPermissionResultListener(listener) }
     }
 
     OnLifecycleEvent { _, event ->
@@ -465,6 +494,22 @@ fun PixelIMSApp(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { onThemeModeChange(themeMode.next()) }) {
+                        Icon(
+                            when (themeMode) {
+                                ThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
+                                ThemeMode.LIGHT -> Icons.Filled.LightMode
+                                ThemeMode.DARK -> Icons.Filled.DarkMode
+                            },
+                            contentDescription = stringResource(
+                                when (themeMode) {
+                                    ThemeMode.SYSTEM -> R.string.appearance_system
+                                    ThemeMode.LIGHT -> R.string.appearance_light
+                                    ThemeMode.DARK -> R.string.appearance_dark
+                                },
+                            ),
+                        )
+                    }
                     if (subscriptions.isNotEmpty()) {
                         IconButton(
                             onClick = { showRecoveryDialog = true },
@@ -492,7 +537,7 @@ fun PixelIMSApp(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f),
+                    scrolledContainerColor = LocalInstrument.current.scrim,
                 ),
             )
         },
@@ -507,34 +552,41 @@ fun PixelIMSApp(
                     Screen("field-test", stringResource(R.string.field_test_short), Icons.Filled.Science),
                 )
                 val inst = LocalInstrument.current
-                // The bar floats again in 2.0, but as a frosted plate with a lit
-                // edge rather than the opaque pill 1.0.6 shipped: it belongs to
-                // the same glass family as the panels it sits over.
-                Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().height(62.dp),
-                        shape = RoundedCornerShape(22.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(1.dp, inst.edgeBright),
-                        tonalElevation = 0.dp,
-                        shadowElevation = 12.dp,
+                val barShape = RoundedCornerShape(30.dp)
+                val selectedIndex = items.indexOfFirst { screen ->
+                    when (screen.route) {
+                        "controls" -> currentRoute in setOf("controls", "config/{subId}", "bands/{subId}")
+                        else -> currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                    }
+                }
+                val lensPosition by animateFloatAsState(
+                    targetValue = selectedIndex.coerceAtLeast(0).toFloat(),
+                    animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+                    label = "nav lens",
+                )
+                // A floating pane of thick glass, with a smaller lens of tinted
+                // glass that slides between tabs rather than jumping.
+                Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 10.dp)) {
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(66.dp)
+                            .liquidGlass(barShape, GlassDepth.THICK)
+                            .padding(5.dp),
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(listOf(inst.frostHigh, inst.frost)),
-                                    RoundedCornerShape(22.dp),
-                                )
-                                .padding(horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            items.forEach { screen ->
-                                val selected = when {
-                                    screen.route == "controls" ->
-                                        currentRoute in setOf("controls", "config/{subId}", "bands/{subId}")
-                                    else -> currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                                }
+                        val slot = maxWidth / items.size
+                        if (selectedIndex >= 0) {
+                            Box(
+                                Modifier
+                                    .offset(x = slot * lensPosition)
+                                    .width(slot)
+                                    .fillMaxHeight()
+                                    .liquidGlass(RoundedCornerShape(25.dp), GlassDepth.TINTED, inst.glow),
+                            )
+                        }
+                        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                            items.forEachIndexed { index, screen ->
+                                val selected = index == selectedIndex
                                 val tint by animateColorAsState(
                                     if (selected) {
                                         MaterialTheme.colorScheme.primary
@@ -543,32 +595,32 @@ fun PixelIMSApp(
                                     },
                                     label = "nav tint",
                                 )
-                                val lift by animateFloatAsState(
-                                    if (selected) 1f else 0f,
-                                    animationSpec = spring(dampingRatio = 0.6f, stiffness = 420f),
-                                    label = "nav lift",
-                                )
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxHeight()
-                                        .clickable {
-                                            navController.navigate(screen.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) {
-                                                    saveState = true
+                                        .clip(RoundedCornerShape(25.dp))
+                                        .selectable(
+                                            selected = selected,
+                                            role = Role.Tab,
+                                            onClick = {
+                                                navController.navigate(screen.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) {
+                                                        saveState = true
+                                                    }
+                                                    launchSingleTop = true
+                                                    restoreState = true
                                                 }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        },
+                                            },
+                                        ),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
                                 ) {
                                     Icon(
                                         screen.icon,
-                                        contentDescription = screen.title,
+                                        contentDescription = null,
                                         tint = tint,
-                                        modifier = Modifier.size(22.dp).graphicsLayer { translationY = -3f * lift },
+                                        modifier = Modifier.size(22.dp),
                                     )
                                     Spacer(Modifier.height(3.dp))
                                     Text(
@@ -576,13 +628,6 @@ fun PixelIMSApp(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = tint,
                                         maxLines = 1,
-                                    )
-                                    Spacer(Modifier.height(3.dp))
-                                    Box(
-                                        Modifier
-                                            .height(2.dp)
-                                            .width((16 * lift).dp)
-                                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
                                     )
                                 }
                             }
@@ -594,7 +639,7 @@ fun PixelIMSApp(
     ) { innerPadding ->
         NavHost(navController, startDestination = startDestination, Modifier.padding(innerPadding)) {
             composable("home", context.resources.getString(R.string.setup)) {
-                SetupPage(subscriptions, navController)
+                SetupPage(subscriptions, navController, rootGranted)
             }
             // The old readiness overview is still reachable; Setup answers the
             // narrower question most people open the app with.
@@ -631,7 +676,7 @@ fun PixelIMSApp(
                 entry.arguments?.getString("subId")?.toIntOrNull()?.let { Editor(it) }
             }
             composable("bands/{subId}", context.resources.getString(R.string.bands)) { entry ->
-                entry.arguments?.getString("subId")?.toIntOrNull()?.let { Bands(it, navController) }
+                entry.arguments?.getString("subId")?.toIntOrNull()?.let { Bands(it, navController, rootGranted) }
             }
         }
     }

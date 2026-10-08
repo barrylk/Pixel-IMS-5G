@@ -13,16 +13,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -36,6 +42,7 @@ import dev.bluehouse.enablevolte.ConfigViewModel
 import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.PrivilegeMode
 import dev.bluehouse.enablevolte.R
+import dev.bluehouse.enablevolte.ShizukuBootReapply
 import dev.bluehouse.enablevolte.components.BooleanPropertyView
 import dev.bluehouse.enablevolte.components.ClickablePropertyView
 import dev.bluehouse.enablevolte.components.Panel
@@ -228,6 +235,30 @@ fun Config(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 12.dp),
         )
+
+        if (PrivilegeManager.activeMode == PrivilegeMode.SHIZUKU) {
+            var reapplyOnBoot by remember { mutableStateOf(ShizukuBootReapply.isEnabled(context)) }
+            Panel(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.shizuku_reapply_on_boot), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.shizuku_reapply_on_boot_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = reapplyOnBoot,
+                        onCheckedChange = {
+                            reapplyOnBoot = it
+                            ShizukuBootReapply.setEnabled(context, it)
+                        },
+                    )
+                }
+            }
+        }
 
         SectionPanel(title = stringResource(R.string.config_section_network), rows = networkRows)
         SectionPanel(title = stringResource(R.string.config_section_calling), rows = callingRows)

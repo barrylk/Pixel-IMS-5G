@@ -61,6 +61,12 @@ fun Monitor(subscriptions: List<SubscriptionInfo>) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedSubId by rememberSaveable { mutableStateOf(subscriptions.firstOrNull()?.subscriptionId ?: -1) }
+    // Subscriptions can arrive (or change) after this page opens; never stay pinned to a missing SIM.
+    LaunchedEffect(subscriptions) {
+        if (subscriptions.none { it.subscriptionId == selectedSubId }) {
+            selectedSubId = subscriptions.firstOrNull()?.subscriptionId ?: -1
+        }
+    }
     val selectedSubscription = subscriptions.firstOrNull { it.subscriptionId == selectedSubId }
     var snapshot by remember { mutableStateOf<SubscriptionModer.RadioDiagnostics?>(null) }
     var error by remember { mutableStateOf<String?>(null) }

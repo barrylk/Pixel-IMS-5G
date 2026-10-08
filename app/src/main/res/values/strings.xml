@@ -201,7 +201,7 @@
     <string name="how_to_5g_description">Follow the path for your selected access mode. Start with NSA and Automatic bands for Sri Lankan networks, then confirm the result in Monitor or Field Test.</string>
     <string name="how_to_root_badge">ROOT • STRONGEST LOCAL FIX</string>
     <string name="how_to_root_5g_title">Enable 5G with Root</string>
-    <string name="how_to_root_5g_steps">1. On Home, choose Root and grant superuser access. The regional modem patch specifically requires Magisk.\n\n2. Open Controls → Band selection &amp; LTE+. Keep bands on Automatic, select Force NSA, and tap Force all local 5G gates.\n\n3. Under Regional modem compatibility (root), confirm the device is compatible, tap Install patch, approve the warning, and reboot.\n\n4. Return near a known 5G site with mobile data enabled. Open Monitor or run the standard Field Test and confirm EN-DC/NR attachment. Use SA only when the carrier actually offers SA.</string>
+    <string name="how_to_root_5g_steps">1. On Home, choose Root and grant superuser access. The regional modem patch specifically requires Magisk.\n\n2. Open Controls → Band selection &amp; LTE+. Keep bands on Automatic, select Force NSA, and tap Force all local 5G gates.\n\n3. The 5G regional modem patch card sits at the top of Setup as soon as root is granted. Confirm the Tensor, Magisk and Modem DB checks are green, tap Validate and install patch, approve the warning, and reboot.\n\n4. Return near a known 5G site with mobile data enabled. Open Monitor or run the standard Field Test and confirm EN-DC/NR attachment. Use SA only when the carrier actually offers SA.</string>
     <string name="how_to_root_5g_note">After a Pixel firmware update, remove the old regional patch before updating, reboot, then validate and install a fresh patch for the new baseband. Root cannot create tower coverage or bypass carrier/SIM authorization.</string>
     <string name="how_to_shizuku_badge">SHIZUKU • ANDROID-SIDE GATES</string>
     <string name="how_to_shizuku_5g_title">Try 5G with Shizuku</string>
@@ -326,8 +326,8 @@
     <string name="root_force_warning">Root Force snapshots the current state, removes band restrictions, enables NSA + SA in CarrierConfig, opens every readable allowed-network reason, enables IMS debug gates, and restarts IMS. It does not write modem NV/EFS. Device-specific NV profiles must match the exact Pixel model and baseband.</string>
     <string name="regional_modem_patch">Regional modem compatibility (root)</string>
     <string name="regional_patch_description">Experimental systemless Tensor modem patch. It copies this firmware’s own cfg.db, validates the SQLite schema and integrity, and maps only wildcard/PTCRB carrier entries to the firmware’s permissive profile. It does not fake the SIM country, registered PLMN, or Wi-Fi regulatory country.</string>
-    <string name="regional_patch_warning">Root and Magisk only. A reboot is required. Before applying a firmware update, remove this patch and reboot; after the update, validate and install a fresh copy. The installer refuses unknown layouts. This can open a local modem profile but cannot bypass Dialog authentication, tower EN-DC configuration, subscriber entitlement, or RF hardware limits.</string>
-    <string name="regional_patch_root_only">Root mode with Magisk is required. This operation is unavailable through Shizuku.</string>
+    <string name="regional_patch_warning">Root with Magisk, KernelSU (plus a mounting metamodule) or APatch only. A reboot is required. Before applying a firmware update, remove this patch and reboot; after the update, validate and install a fresh copy. The installer refuses unknown layouts. This can open a local modem profile but cannot bypass Dialog authentication, tower EN-DC configuration, subscriber entitlement, or RF hardware limits.</string>
+    <string name="regional_patch_root_only">Root mode with Magisk, KernelSU or APatch is required. This operation is unavailable through Shizuku.</string>
     <string name="shizuku_regional_profile">Regional 5G compatibility (Shizuku)</string>
     <string name="shizuku_regional_description">Applies every reversible Android-side regional gate available to the Shizuku shell: LTE + NR network policy, NSA + SA CarrierConfig, VoLTE, VoWiFi, VoNR, LTE+ and IMS visibility. It requests Automatic bands where the modem API supports it, then reads the effective regional gates back.</string>
     <string name="shizuku_regional_apply">Apply Shizuku regional profile</string>
@@ -439,4 +439,27 @@
     <string name="modem_patch_credit">Wildcard/PTCRB Tensor cfg.db mapping research credited to the Pixel Modem Fix and Displax modem-fix projects. Pixel IMS 5G independently validates and patches the current firmware database.</string>
     <string name="license">Open-source license</string>
     <string name="unofficial_notice">Pixel IMS 5G is an unofficial community project. It is not affiliated with Google, mobile carriers, Facebook, or GitHub.</string>
+    <!-- 2.2: liquid glass, appearance, regional patch on home -->
+    <string name="appearance_system">Appearance: follow system</string>
+    <string name="appearance_light">Appearance: light</string>
+    <string name="appearance_dark">Appearance: dark</string>
+    <string name="patch_card_step">Step 1 · Root</string>
+    <string name="patch_card_title">5G regional modem patch</string>
+    <string name="patch_card_pitch">Lets the Tensor modem accept 5G (EN-DC) on carriers its firmware does not list. Do this first, then reboot.</string>
+    <string name="patch_card_checking">Checking the modem patch…</string>
+    <string name="patch_card_active">Patch active</string>
+    <string name="patch_card_active_body">The modem is using the regional compatibility profile.</string>
+    <string name="patch_card_reboot">Reboot to activate</string>
+    <string name="patch_card_reboot_body">The patch is staged. It takes effect on the next reboot.</string>
+    <string name="patch_card_removing">Removal pending</string>
+    <string name="patch_card_removing_body">The stock modem database comes back on the next reboot.</string>
+    <string name="patch_card_unavailable">Not available on this device</string>
+    <string name="patch_card_ready">Not installed</string>
+    <string name="patch_card_details">Details</string>
+    <string name="patch_card_hide_details">Hide details</string>
+    <string name="patch_check_magisk">Magisk / KSU</string>
+    <string name="patch_check_device">Tensor</string>
+    <string name="patch_check_firmware">Modem DB</string>
+    <string name="shizuku_reapply_on_boot">Reapply after reboot</string>
+    <string name="shizuku_reapply_on_boot_summary">Saves SIM Config changes made from now on and reapplies them once Shizuku is running after a reboot. Shizuku has to start on boot (for example a fork that does).</string>
 </resources>

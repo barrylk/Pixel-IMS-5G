@@ -32,9 +32,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,10 +53,15 @@ import dev.bluehouse.enablevolte.CheckStatus
 import dev.bluehouse.enablevolte.FixAction
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.ReadinessCheck
+import dev.bluehouse.enablevolte.RegionalModemPatchStatus
+import dev.bluehouse.enablevolte.RegionalPatchAction
+import dev.bluehouse.enablevolte.RegionalPatchViewModel
 import dev.bluehouse.enablevolte.SetupState
 import dev.bluehouse.enablevolte.SetupViewModel
+import dev.bluehouse.enablevolte.components.GlassDepth
 import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PanelGroup
+import dev.bluehouse.enablevolte.components.RegionalPatchCard
 import dev.bluehouse.enablevolte.components.RowDivider
 import dev.bluehouse.enablevolte.components.SignalChip
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
@@ -73,14 +81,28 @@ import dev.bluehouse.enablevolte.uniqueName
 fun SetupPage(
     subscriptions: List<SubscriptionInfo>,
     navController: NavController,
+    rootGranted: Boolean,
 ) {
     val context = LocalContext.current
     var slot by rememberSaveable { mutableIntStateOf(0) }
-    val subscription = subscriptions.getOrNull(slot)
+    // A saved slot can outlive the SIM it pointed at (eSIM switched off, tray
+    // pulled); fall back to the first SIM rather than claiming there is none.
+    val subscription = subscriptions.getOrNull(slot) ?: subscriptions.firstOrNull()
     val scrollState = rememberScrollState()
 
+    // The patch is device-wide and root-only, so it leads the page for root
+    // users whether or not a SIM has been read yet.
+    val patchViewModel: RegionalPatchViewModel? =
+        if (rootGranted) viewModel<RegionalPatchViewModel>(key = "regional-patch") else null
+    val patchState = patchViewModel?.state?.collectAsState()?.value
+
     if (subscription == null) {
-        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Spacer(Modifier.height(4.dp))
+            patchViewModel?.let { RegionalPatchCard(it) }
             Panel(Modifier.fillMaxWidth()) {
                 Text(
                     stringResource(R.string.controls_no_sim),
@@ -99,17 +121,27 @@ fun SetupPage(
         )
     val ui by viewModel.state.collectAsState()
 
+    // Installing or removing the patch changes what the checks below report.
+    var seenPatch by remember { mutableStateOf<RegionalModemPatchStatus?>(null) }
+    LaunchedEffect(patchState?.status) {
+        val now = patchState?.status ?: return@LaunchedEffect
+        if (seenPatch != null && seenPatch != now) viewModel.refresh()
+        seenPatch = now
+    }
+
     Column(
         modifier = Modifier.padding(horizontal = 16.dp).verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Spacer(Modifier.height(4.dp))
 
+        patchViewModel?.let { RegionalPatchCard(it) }
+
         if (subscriptions.size > 1) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 subscriptions.forEachIndexed { index, sub ->
                     FilterChip(
-                        selected = index == slot,
+                        selected = sub.subscriptionId == subscription.subscriptionId,
                         onClick = { slot = index },
                         label = { Text(sub.uniqueName, maxLines = 1) },
                     )
@@ -147,6 +179,9 @@ fun SetupPage(
                             when (check.fix) {
                                 FixAction.OPEN_BANDS -> navController.navigate("bands/${subscription.subscriptionId}")
                                 FixAction.OPEN_EXPERT -> navController.navigate("config/${subscription.subscriptionId}")
+                                // Through the card's confirmation dialog, never straight to the installer.
+                                FixAction.INSTALL_MODEM_PATCH ->
+                                    patchViewModel?.requestConfirmation(RegionalPatchAction.INSTALL)
                                 else -> viewModel.applyFix(check.fix)
                             }
                         },
@@ -193,7 +228,11 @@ private fun VerdictPanel(
         else -> inst.fair
     }
 
-    Panel(Modifier.fillMaxWidth()) {
+    Panel(
+        Modifier.fillMaxWidth(),
+        depth = if (ui.loading) GlassDepth.REGULAR else GlassDepth.TINTED,
+        tint = if (ui.loading) Color.Unspecified else tone,
+    ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(contentAlignment = Alignment.Center) {
