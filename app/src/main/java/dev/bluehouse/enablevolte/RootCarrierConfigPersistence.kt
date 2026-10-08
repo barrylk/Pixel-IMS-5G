@@ -12,14 +12,31 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-internal object RootCarrierConfigPersistence {
+/** Reapplies every saved per-SIM profile through whichever privilege mode is active. */
+internal object CarrierConfigPersistence {
     fun reapplyAll(context: Context): Boolean {
-        if (PrivilegeManager.activeMode != PrivilegeMode.ROOT || !PrivilegeManager.isRootReady()) return false
+        val ready = when (PrivilegeManager.activeMode) {
+            PrivilegeMode.ROOT -> PrivilegeManager.isRootReady()
+            PrivilegeMode.SHIZUKU -> ShizukuBootReapply.isEnabled(context) && checkShizukuGrantedQuietly()
+        }
+        if (!ready) return false
         val carrierModer = CarrierModer(context)
         return carrierModer.subscriptions
             .filter { RootCarrierConfigStore(context).hasProfile(it.subscriptionId) }
-            .all { SubscriptionModer(context, it.subscriptionId).reapplyPersistedRootCarrierConfig() }
+            .all { SubscriptionModer(context, it.subscriptionId).reapplyPersistedCarrierConfig() }
     }
+
+    /** Unlike checkShizukuPermission, never raises a permission prompt from the background. */
+    private fun checkShizukuGrantedQuietly(): Boolean =
+        runCatching {
+            rikka.shizuku.Shizuku.pingBinder() &&
+                rikka.shizuku.Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false)
+}
+
+internal object RootCarrierConfigPersistence {
+    fun reapplyAll(context: Context): Boolean =
+        PrivilegeManager.activeMode == PrivilegeMode.ROOT && CarrierConfigPersistence.reapplyAll(context)
 
     fun schedule(context: Context, delaySeconds: Long) {
         if (PrivilegeManager.selectedMode(context) != PrivilegeMode.ROOT) return
@@ -42,6 +59,9 @@ class RootCarrierConfigPersistenceWorker(
 ) : Worker(appContext, workerParams) {
     override fun doWork(): Result {
         if (PrivilegeManager.selectedMode(applicationContext) != PrivilegeMode.ROOT) return Result.success()
+        // Runs without HomeActivity, which is where the exemptions are normally added;
+        // without them the hidden telephony interfaces fail to load at boot.
+        org.lsposed.hiddenapibypass.HiddenApiBypass.addHiddenApiExemptions("L", "I")
         PrivilegeManager.activate(applicationContext, PrivilegeMode.ROOT)
 
         val completed = CountDownLatch(1)
@@ -59,5 +79,6 @@ class RootCarrierConfigBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val delay = if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) 3L else 20L
         RootCarrierConfigPersistence.schedule(context.applicationContext, delay)
+        ShizukuBootReapply.schedule(context.applicationContext, delay)
     }
 }

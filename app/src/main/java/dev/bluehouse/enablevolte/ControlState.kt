@@ -1,6 +1,7 @@
 package dev.bluehouse.enablevolte
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
@@ -63,10 +64,19 @@ suspend fun <T> applyAndConfirm(
     requested: T,
     write: () -> Unit,
     readBack: () -> T?,
+    settleDelaysMs: List<Long> = DEFAULT_SETTLE_DELAYS_MS,
 ): WriteOutcome<T> = withContext(Dispatchers.IO) {
     try {
         write()
-        val actual = readBack()
+        // CarrierConfig propagates asynchronously (and the Shizuku broker more so),
+        // so one immediate read can see the old value. Give it a moment to settle
+        // before calling the change rejected.
+        var actual = readBack()
+        for (wait in settleDelaysMs) {
+            if (actual == requested) break
+            delay(wait)
+            actual = readBack()
+        }
         if (actual == requested) {
             WriteOutcome.Confirmed(requested)
         } else {
@@ -76,6 +86,9 @@ suspend fun <T> applyAndConfirm(
         WriteOutcome.Failed(e.message ?: "This change could not be applied.")
     }
 }
+
+/** Roughly two seconds in all, front-loaded because most writes land within the first. */
+val DEFAULT_SETTLE_DELAYS_MS = listOf(150L, 250L, 400L, 600L, 800L)
 
 /**
  * Reads a value off the main thread, returning null rather than throwing when

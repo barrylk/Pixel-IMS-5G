@@ -1,6 +1,7 @@
 package dev.bluehouse.enablevolte
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.IActivityManager
 import android.app.Instrumentation
 import android.content.Context
@@ -39,7 +40,7 @@ class BrokerInstrumentation : Instrumentation() {
             }
         } finally {
             Log.i(TAG, "applyConfig done")
-            am.stopDelegateShellPermissionIdentity()
+            stopShellIdentity(am)
         }
     }
 
@@ -64,28 +65,78 @@ class BrokerInstrumentation : Instrumentation() {
             }
         } finally {
             Log.i(TAG, "clearConfig done")
-            am.stopDelegateShellPermissionIdentity()
+            stopShellIdentity(am)
         }
+    }
+
+    /**
+     * Drops the delegated shell identity.
+     *
+     * Android 17 QPR2 changed this AIDL method, and calling the old signature
+     * throws NoSuchMethodError — after the override has already been applied —
+     * which took the whole app down with it (issues #7 and #14). The direct call
+     * is tried first, then any method by that name, and a failure is only
+     * logged: the activity manager drops the delegation itself when the
+     * instrumentation finishes.
+     */
+    private fun stopShellIdentity(am: IActivityManager) {
+        try {
+            am.stopDelegateShellPermissionIdentity()
+            return
+        } catch (e: LinkageError) {
+            Log.w(TAG, "stopDelegateShellPermissionIdentity() is gone on this build; trying reflection", e)
+        } catch (e: Exception) {
+            Log.w(TAG, "stopDelegateShellPermissionIdentity failed", e)
+            return
+        }
+        val method = am.javaClass.methods.firstOrNull { it.name == "stopDelegateShellPermissionIdentity" }
+        if (method == null) {
+            Log.w(TAG, "No stopDelegateShellPermissionIdentity on this build; relying on instrumentation teardown")
+            return
+        }
+        runCatching {
+            val args = method.parameterTypes.map { type ->
+                when (type) {
+                    Int::class.javaPrimitiveType -> Os.getuid()
+                    Long::class.javaPrimitiveType -> 0L
+                    Boolean::class.javaPrimitiveType -> false
+                    else -> null
+                }
+            }
+            method.invoke(am, *args.toTypedArray())
+        }.onFailure { Log.w(TAG, "Reflective stopDelegateShellPermissionIdentity failed", it) }
     }
 
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
 
         if (arguments == null) {
+            finish(Activity.RESULT_CANCELED, Bundle())
             return
         }
 
         val clear = arguments.getBoolean("moder_clear")
         val subId = arguments.getInt("moder_subId")
 
-        try {
+        // This runs on the app's own main thread: anything thrown here kills the
+        // app, so failures are reported back to the caller instead.
+        val result = Bundle()
+        val code = try {
             if (clear) {
                 this.clearConfig(subId)
             } else {
                 this.applyConfig(subId, arguments)
             }
-        } finally {
-            finish(0, Bundle())
+            Activity.RESULT_OK
+        } catch (t: Throwable) {
+            Log.e(TAG, "Broker failed to apply the carrier config", t)
+            result.putString(RESULT_ERROR, t.message ?: t.javaClass.simpleName)
+            Activity.RESULT_CANCELED
         }
+        finish(code, result)
+    }
+
+    companion object {
+        const val RESULT_ERROR = "moder_error"
     }
 }

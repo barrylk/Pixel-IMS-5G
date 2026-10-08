@@ -30,10 +30,28 @@ class ControlStateTest {
                     requested = true,
                     write = { },
                     readBack = { false },
+                    settleDelaysMs = listOf(1L, 1L),
                 )
 
             assertTrue(outcome is WriteOutcome.Rejected)
             assertEquals(false, (outcome as WriteOutcome.Rejected).actual)
+        }
+
+    @Test
+    fun waitsForAValueThatLandsLate() =
+        runBlocking {
+            var reads = 0
+            val outcome =
+                applyAndConfirm(
+                    requested = true,
+                    write = { },
+                    // The broker applies the override a beat after the write returns.
+                    readBack = { ++reads >= 3 },
+                    settleDelaysMs = listOf(1L, 1L, 1L, 1L),
+                )
+
+            assertTrue(outcome is WriteOutcome.Confirmed)
+            assertEquals(3, reads)
         }
 
     @Test

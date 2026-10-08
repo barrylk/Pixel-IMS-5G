@@ -3,12 +3,14 @@ package dev.bluehouse.enablevolte
 import android.annotation.SuppressLint
 import android.app.IActivityManager
 import android.app.UiAutomationConnection
+import android.app.IInstrumentationWatcher
 import android.content.ComponentName
 import android.content.Context
 import android.content.res.Resources
 import android.os.Build
 import android.os.Build.VERSION_CODES
 import android.os.Bundle
+import android.os.Looper
 import android.os.IInterface
 import android.os.IBinder
 import android.os.Parcel
@@ -138,6 +140,9 @@ open class Moder {
  * navigating away mid-operation, say — would leave the radio half-configured.
  */
 private fun settlePause(millis: Long) = Thread.sleep(millis)
+
+/** How long a background caller waits for the Shizuku broker to report its result. */
+private const val BROKER_TIMEOUT_SECONDS = 5L
 
 class CarrierModer(
     private val context: Context,
@@ -1541,16 +1546,37 @@ class SubscriptionModer(
             }
         arg.putInt("moder_subId", subscriptionId)
 
+        // startInstrumentation returns before the broker has run, so a read-back
+        // straight after it raced the write and reported "did not accept" (#14).
+        // The watcher lets callers off the main thread wait for the real result.
+        val finished = CountDownLatch(1)
+        val brokerError = AtomicReference<String?>(null)
+        val watcher = object : IInstrumentationWatcher.Stub() {
+            override fun instrumentationStatus(name: ComponentName?, resultCode: Int, results: Bundle?) = Unit
+
+            override fun instrumentationFinished(name: ComponentName?, resultCode: Int, results: Bundle?) {
+                brokerError.set(results?.getString(BrokerInstrumentation.RESULT_ERROR))
+                finished.countDown()
+            }
+        }
+
         am.startInstrumentation(
             ComponentName(context, Class.forName("dev.bluehouse.enablevolte.BrokerInstrumentation")),
             null,
             8,
             arg,
-            null,
+            watcher,
             UiAutomationConnection(),
             0,
             null,
         )
+        // The broker runs on the main thread, so waiting there would deadlock.
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            if (!finished.await(BROKER_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                Log.w(TAG, "Broker did not report back within ${BROKER_TIMEOUT_SECONDS}s")
+            }
+            brokerError.get()?.let { throw IllegalStateException(it) }
+        }
     }
 
     private fun overrideConfig(bundle: Bundle?) {
@@ -1575,7 +1601,11 @@ class SubscriptionModer(
     ) {
         val delta = Bundle()
         fn(delta)
-        if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
+        // Root always keeps a profile; Shizuku only when "reapply after reboot" is on.
+        if (
+            PrivilegeManager.activeMode == PrivilegeMode.ROOT ||
+            (persistForRoot && ShizukuBootReapply.isEnabled(context))
+        ) {
             val store = RootCarrierConfigStore(context)
             val merged = store.merge(subscriptionId, delta)
             this.overrideConfig(merged)
@@ -1654,9 +1684,9 @@ class SubscriptionModer(
         RootCarrierConfigStore(context).clear(subscriptionId)
     }
 
-    internal fun reapplyPersistedRootCarrierConfig(): Boolean =
+    internal fun reapplyPersistedCarrierConfig(): Boolean =
         runCatching {
-            check(PrivilegeManager.activeMode == PrivilegeMode.ROOT && PrivilegeManager.isRootReady())
+            check(PrivilegeManager.activeMode == PrivilegeMode.SHIZUKU || PrivilegeManager.isRootReady())
             val store = RootCarrierConfigStore(context)
             if (!store.hasProfile(subscriptionId)) return true
             this.overrideConfig(store.load(subscriptionId))

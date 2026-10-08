@@ -73,7 +73,7 @@ fun NetworkPage(
 ) {
     val context = LocalContext.current
     var slot by rememberSaveable { mutableIntStateOf(0) }
-    val subscription = subscriptions.getOrNull(slot)
+    val subscription = subscriptions.getOrNull(slot) ?: subscriptions.firstOrNull()
     val scrollState = rememberScrollState()
 
     if (subscription == null) {
@@ -128,7 +128,7 @@ fun NetworkPage(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 subscriptions.forEachIndexed { index, sub ->
                     FilterChip(
-                        selected = index == slot,
+                        selected = sub.subscriptionId == subscription?.subscriptionId,
                         onClick = { slot = index },
                         label = { Text(sub.uniqueName, maxLines = 1) },
                     )

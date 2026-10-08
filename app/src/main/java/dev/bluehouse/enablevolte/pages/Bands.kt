@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -38,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import dev.bluehouse.enablevolte.ui.theme.NumericSmallTextStyle
 import dev.bluehouse.enablevolte.components.statusToneColor
@@ -45,11 +45,11 @@ import dev.bluehouse.enablevolte.components.StatusTone
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.PrivilegeMode
-import dev.bluehouse.enablevolte.RegionalModemPatchStatus
 import dev.bluehouse.enablevolte.SubscriptionModer
 import dev.bluehouse.enablevolte.components.ClickablePropertyView
 import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.HeaderText
+import dev.bluehouse.enablevolte.components.RegionalPatchCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -145,6 +145,7 @@ private fun BandPicker(
 fun Bands(
     subId: Int,
     navController: NavController,
+    rootGranted: Boolean = false,
 ) {
     val context = LocalContext.current
     val moder = remember(subId) { SubscriptionModer(context, subId) }
@@ -156,19 +157,16 @@ fun Bands(
     var currentSelection by rememberSaveable { mutableStateOf(context.getString(R.string.band_automatic)) }
     var radioMode by rememberSaveable { mutableStateOf(0) }
     var easyMode by rememberSaveable { mutableStateOf(false) }
-    var easyModeBusy by rememberSaveable { mutableStateOf(false) }
+    var easyModeBusy by remember { mutableStateOf(false) }
     var caStatus by rememberSaveable { mutableStateOf(context.getString(R.string.checking)) }
     var servingBands by rememberSaveable { mutableStateOf(context.getString(R.string.checking)) }
     var visibleBands by rememberSaveable { mutableStateOf(context.getString(R.string.checking)) }
     var nrAttachStatus by rememberSaveable { mutableStateOf(context.getString(R.string.checking)) }
     var noServiceChange by rememberSaveable { mutableStateOf<String?>(null) }
     var rootForceReport by remember { mutableStateOf<SubscriptionModer.RootForceReport?>(null) }
-    var rootForceBusy by rememberSaveable { mutableStateOf(false) }
-    var shizukuRegionalBusy by rememberSaveable { mutableStateOf(false) }
+    var rootForceBusy by remember { mutableStateOf(false) }
+    var shizukuRegionalBusy by remember { mutableStateOf(false) }
     var shizukuRegionalResult by remember { mutableStateOf<SubscriptionModer.ShizukuRegionalResult?>(null) }
-    var regionalPatch by remember { mutableStateOf<RegionalModemPatchStatus?>(null) }
-    var regionalPatchBusy by rememberSaveable { mutableStateOf(false) }
-    var regionalConfirmation by rememberSaveable { mutableStateOf<String?>(null) }
     var bandLoadError by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun loadSelection() {
@@ -228,15 +226,6 @@ fun Bands(
                     withContext(Dispatchers.IO) { moder.getRootForceReport(radio) }
                 } else {
                     null
-                }
-                loadStage = "Regional modem patch"
-                regionalPatch = if (
-                    PrivilegeManager.activeMode == PrivilegeMode.ROOT &&
-                    PrivilegeManager.isRootReady()
-                ) {
-                    withContext(Dispatchers.IO) { PrivilegeManager.getRegionalModemPatchStatus() }
-                } else {
-                    RegionalModemPatchStatus.unavailable(context.getString(R.string.regional_patch_root_only))
                 }
                 loadStage = "Service state"
                 noServiceChange = withContext(Dispatchers.IO) {
@@ -366,66 +355,7 @@ fun Bands(
         }
     }
 
-    fun runRegionalPatchAction(action: String) {
-        if (regionalPatchBusy) return
-        scope.launch {
-            regionalPatchBusy = true
-            regionalPatch = withContext(Dispatchers.IO) {
-                when (action) {
-                    "install" -> PrivilegeManager.installRegionalModemPatch()
-                    else -> PrivilegeManager.scheduleRegionalModemPatchRemoval()
-                }
-            }
-            regionalPatchBusy = false
-        }
-    }
-
     LaunchedEffect(subId) { loadSelection() }
-
-    regionalConfirmation?.let { action ->
-        AlertDialog(
-            onDismissRequest = { regionalConfirmation = null },
-            title = {
-                Text(
-                    stringResource(
-                        if (action == "install") {
-                            R.string.regional_patch_confirm_title
-                        } else {
-                            R.string.regional_patch_remove_confirm_title
-                        },
-                    ),
-                )
-            },
-            text = {
-                Text(
-                    stringResource(
-                        if (action == "install") {
-                            R.string.regional_patch_confirm_message
-                        } else {
-                            R.string.regional_patch_remove_confirm_message
-                        },
-                    ),
-                )
-            },
-            confirmButton = {
-                Button(onClick = {
-                    regionalConfirmation = null
-                    runRegionalPatchAction(action)
-                }) {
-                    Text(
-                        stringResource(
-                            if (action == "install") R.string.install_patch else R.string.schedule_removal,
-                        ),
-                    )
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { regionalConfirmation = null }) {
-                    Text(stringResource(R.string.dismiss))
-                }
-            },
-        )
-    }
 
     Column(
         modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
@@ -634,100 +564,9 @@ fun Bands(
             }
         }
 
-        if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
+        if (rootGranted) {
             HeaderText(text = stringResource(R.string.regional_modem_patch))
-            Panel(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    stringResource(R.string.regional_patch_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                regionalPatch?.let { patch ->
-                    ClickablePropertyView(
-                        label = stringResource(R.string.patch_device),
-                        value = patch.device.ifBlank { stringResource(R.string.status_unknown) },
-                    )
-                    ClickablePropertyView(
-                        label = stringResource(R.string.patch_compatibility),
-                        value = stringResource(
-                            if (patch.supported && patch.magiskAvailable && patch.sourceAvailable) {
-                                R.string.patch_compatible
-                            } else {
-                                R.string.patch_unavailable
-                            },
-                        ),
-                    )
-                    ClickablePropertyView(
-                        label = stringResource(R.string.patch_status),
-                        value = stringResource(
-                            when {
-                                patch.removalPending -> R.string.patch_removal_pending
-                                patch.installed -> R.string.patch_installed
-                                else -> R.string.patch_not_installed
-                            },
-                        ),
-                    )
-                    Text(patch.message)
-                    if (patch.sourceSha256.isNotBlank()) {
-                        ClickablePropertyView(
-                            label = stringResource(R.string.stock_database_hash),
-                            value = patch.sourceSha256.take(16) + "…",
-                        )
-                    }
-                    if (patch.patchedSha256.isNotBlank()) {
-                        ClickablePropertyView(
-                            label = stringResource(R.string.patched_database_hash),
-                            value = patch.patchedSha256.take(16) + "…",
-                        )
-                    }
-                    if (!patch.installed) {
-                        Button(
-                            enabled = !regionalPatchBusy &&
-                                patch.supported &&
-                                patch.magiskAvailable &&
-                                patch.sourceAvailable,
-                            onClick = { regionalConfirmation = "install" },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                stringResource(
-                                    if (regionalPatchBusy) R.string.applying_profile else R.string.install_patch,
-                                ),
-                            )
-                        }
-                    } else {
-                        if (patch.rebootRequired && !patch.removalPending) {
-                            Button(
-                                enabled = !regionalPatchBusy &&
-                                    patch.supported &&
-                                    patch.magiskAvailable &&
-                                    patch.sourceAvailable,
-                                onClick = { regionalConfirmation = "install" },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(R.string.reinstall_patch))
-                            }
-                        }
-                        if (!patch.removalPending) {
-                            OutlinedButton(
-                                enabled = !regionalPatchBusy,
-                                onClick = { regionalConfirmation = "remove" },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(R.string.remove_patch))
-                            }
-                        }
-                    }
-                }
-                Text(
-                    stringResource(R.string.regional_patch_warning),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            }
+            RegionalPatchCard(viewModel<dev.bluehouse.enablevolte.RegionalPatchViewModel>(key = "regional-patch"), compactWhenActive = false)
         }
 
         HeaderText(text = stringResource(R.string.band_selection))

@@ -13,6 +13,8 @@ data class RegionalModemPatchStatus(
     val sourceSha256: String,
     val patchedSha256: String,
     val message: String,
+    /** Magisk, KernelSU or APatch; empty when none was found or the service predates 2.2. */
+    val rootManager: String = "",
 ) {
     companion object {
         fun fromJson(value: String): RegionalModemPatchStatus {
@@ -28,6 +30,7 @@ data class RegionalModemPatchStatus(
                 sourceSha256 = json.optString("sourceSha256"),
                 patchedSha256 = json.optString("patchedSha256"),
                 message = json.optString("message"),
+                rootManager = json.optString("rootManager"),
             )
         }
 

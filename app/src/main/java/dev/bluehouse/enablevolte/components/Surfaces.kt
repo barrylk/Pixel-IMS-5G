@@ -1,13 +1,11 @@
 package dev.bluehouse.enablevolte.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
@@ -15,38 +13,58 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 
 /**
- * The page ground, lit from above.
+ * The page ground, lit by three soft pools of light.
  *
- * The gradient is not decoration. Panels are translucent, so whatever is behind
- * them decides whether they read as objects or as nothing at all — a flat
- * near-black ground is what made the first attempt at this look like outlines
- * on a void.
+ * The pools are not decoration. Panels are translucent, so whatever is behind
+ * them decides whether they read as glass or as nothing at all — a flat ground
+ * is what made earlier attempts look like outlines on a void. They are large
+ * and smooth because Compose has no backdrop blur: a blurred smooth gradient
+ * looks like the gradient, so the panes read as frosted without sampling.
  */
 @Composable
 fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
     val colors = MaterialTheme.colorScheme
     val inst = LocalInstrument.current
+    val strength = if (inst.isDark) 0.34f else 0.55f
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.background)
-            .background(
-                Brush.verticalGradient(
-                    0.0f to inst.glow.copy(alpha = if (inst.isDark) 0.20f else 0.10f),
-                    0.28f to inst.glow.copy(alpha = if (inst.isDark) 0.05f else 0.025f),
-                    0.60f to Color.Transparent,
-                    1.0f to Color.Black.copy(alpha = if (inst.isDark) 0.30f else 0f),
-                ),
-            ),
+            .drawWithCache {
+                val w = size.width
+                val h = size.height
+                val reach = maxOf(w, h)
+                val pools = listOf(
+                    Triple(inst.pools[0], Offset(w * 0.05f, h * 0.06f), reach * 0.62f),
+                    Triple(inst.pools[1], Offset(w * 1.02f, h * 0.38f), reach * 0.55f),
+                    Triple(inst.pools[2], Offset(w * 0.20f, h * 0.92f), reach * 0.50f),
+                ).map { (color, center, radius) ->
+                    Brush.radialGradient(
+                        0f to color.copy(alpha = strength),
+                        0.45f to color.copy(alpha = strength * 0.35f),
+                        1f to Color.Transparent,
+                        center = center,
+                        radius = radius,
+                    )
+                }
+                val vignette = Brush.verticalGradient(
+                    0.7f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = if (inst.isDark) 0.35f else 0f),
+                )
+                onDrawBehind {
+                    pools.forEach { drawRect(it) }
+                    drawRect(vignette)
+                }
+            },
     ) {
         CompositionLocalProvider(LocalContentColor provides colors.onBackground) {
             content()
@@ -55,41 +73,24 @@ fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
 }
 
 /**
- * A frosted panel.
+ * A pane of liquid glass holding one block of content.
  *
- * Three things make this read as glass without a backdrop blur, which Compose
- * cannot do: a fill bright enough to separate from the ground on its own, a
- * gradient running top-to-bottom so the surface has a direction, and a one-pixel
- * sheen along the top edge where a real pane would catch the light.
+ * See [liquidGlass] for how the pane is drawn.
  */
 @Composable
 fun Panel(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    depth: GlassDepth = GlassDepth.REGULAR,
+    tint: Color = Color.Unspecified,
     content: @Composable () -> Unit,
 ) {
-    val inst = LocalInstrument.current
     val colors = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.large
-    val fill = Brush.verticalGradient(listOf(inst.frostHigh, inst.frost))
-    val border = BorderStroke(1.dp, inst.edge)
 
     @Composable
     fun Body() {
-        Box(Modifier.background(fill, shape).clip(shape)) {
-            content()
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color.Transparent, inst.sheen, Color.Transparent),
-                        ),
-                    ),
-            )
-        }
+        Box(Modifier.liquidGlass(shape, depth, tint)) { content() }
     }
 
     if (onClick == null) {
@@ -98,9 +99,7 @@ fun Panel(
             shape = shape,
             color = Color.Transparent,
             contentColor = colors.onSurface,
-            border = border,
             tonalElevation = 0.dp,
-            shadowElevation = if (inst.isDark) 0.dp else 2.dp,
         ) { Body() }
     } else {
         Surface(
@@ -109,9 +108,7 @@ fun Panel(
             shape = shape,
             color = Color.Transparent,
             contentColor = colors.onSurface,
-            border = border,
             tonalElevation = 0.dp,
-            shadowElevation = if (inst.isDark) 0.dp else 2.dp,
         ) { Body() }
     }
 }

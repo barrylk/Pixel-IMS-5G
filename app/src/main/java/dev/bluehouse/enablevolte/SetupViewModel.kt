@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -75,12 +76,16 @@ class SetupViewModel(
     private val _state = kotlinx.coroutines.flow.MutableStateFlow(SetupState())
     val state: kotlinx.coroutines.flow.StateFlow<SetupState> = _state
 
+    private var checkJob: Job? = null
+
     init {
         refresh()
     }
 
     fun refresh() {
-        viewModelScope.launch {
+        // A newer refresh supersedes an older one rather than racing it to the state.
+        checkJob?.cancel()
+        checkJob = viewModelScope.launch {
             _state.value = _state.value.copy(loading = _state.value.checks.isEmpty())
             val result = withContext(Dispatchers.IO) { runChecks() }
             _state.value = _state.value.copy(loading = false, checks = result.first, carrier = result.second, busyFix = null)
@@ -88,7 +93,7 @@ class SetupViewModel(
     }
 
     fun applyFix(action: FixAction) {
-        if (action == FixAction.NONE) return
+        if (action == FixAction.NONE || _state.value.busyFix != null) return
         _state.value = _state.value.copy(busyFix = action)
         viewModelScope.launch {
             val note = withContext(Dispatchers.IO) {
@@ -115,14 +120,8 @@ class SetupViewModel(
                             )
                             "NR set to NSA and SA."
                         }
-                        FixAction.INSTALL_MODEM_PATCH -> {
-                            val status = PrivilegeManager.installRegionalModemPatch()
-                            if (status.rebootRequired) {
-                                "Patch installed. Reboot for the modem to pick it up."
-                            } else {
-                                status.message.ifBlank { "Patch step finished." }
-                            }
-                        }
+                        // The modem patch is never applied from here: it goes through
+                        // RegionalPatchViewModel and its confirmation dialog.
                         FixAction.RESTART_IMS -> {
                             moder.restartIMSRegistration()
                             "IMS registration restarted."
@@ -146,7 +145,12 @@ class SetupViewModel(
         val rootMode = PrivilegeManager.activeMode == PrivilegeMode.ROOT
 
         val privileged = runCatching {
-            (rootMode && PrivilegeManager.isRootReady()) || checkShizukuPermission(0) == ShizukuStatus.GRANTED
+            ReadinessRules.hasAccess(
+                rootMode = rootMode,
+                rootReady = rootMode && PrivilegeManager.isRootReady(),
+                // Only asked in Shizuku mode: the check can raise a permission prompt.
+                shizukuGranted = !rootMode && checkShizukuPermission(0) == ShizukuStatus.GRANTED,
+            )
         }.getOrDefault(false)
 
         out += ReadinessCheck(
@@ -238,21 +242,13 @@ class SetupViewModel(
                     patch.removalPending -> "Removal is pending — reboot to finish"
                     patch.installed && patch.rebootRequired -> "Installed. Reboot for the modem to load it"
                     patch.installed -> "Installed"
-                    !patch.magiskAvailable -> "Magisk was not found, so the systemless patch cannot be installed"
+                    !patch.magiskAvailable -> "No Magisk, KernelSU or APatch was found, so the systemless patch cannot be installed"
+                    !patch.sourceAvailable -> "This firmware's modem database could not be read, so there is nothing to patch"
                     else -> "Not installed. This is the step that makes the modem accept EN-DC"
                 },
-                status = when {
-                    patch == null -> CheckStatus.UNKNOWN
-                    !patch.supported -> CheckStatus.WARN
-                    patch.installed -> CheckStatus.PASS
-                    else -> CheckStatus.FAIL
-                },
-                fix = if (patch != null && patch.supported && !patch.installed && patch.magiskAvailable) {
-                    FixAction.INSTALL_MODEM_PATCH
-                } else {
-                    FixAction.NONE
-                },
-                fixLabel = if (patch != null && patch.supported && !patch.installed && patch.magiskAvailable) "Apply patch" else null,
+                status = ReadinessRules.patchStatus(patch),
+                fix = if (patch != null && ReadinessRules.canInstallPatch(patch)) FixAction.INSTALL_MODEM_PATCH else FixAction.NONE,
+                fixLabel = if (patch != null && ReadinessRules.canInstallPatch(patch)) "Apply patch" else null,
             )
         } else {
             out += ReadinessCheck(
@@ -267,17 +263,20 @@ class SetupViewModel(
         // The outcome, not a setting: is there actually an NR leg up right now.
         val radio = runCatching { moder.getRadioDiagnostics() }.getOrNull()
         val nrCell = radio?.cells?.firstOrNull { it.registered && it.type.contains("NR", ignoreCase = true) }
+        val connected = radio != null && ReadinessRules.is5gConnected(radio.dataRat, radio.nrState, nrCell != null)
         out += ReadinessCheck(
             id = "endc",
             title = "5G connected",
             detail = when {
                 radio == null -> "Could not read the radio"
                 nrCell != null -> "Attached on ${nrCell.band} · ${nrCell.channel} · ${nrCell.rsrp ?: nrCell.dbm} dBm"
+                connected && radio?.dataRat == "NR" -> "Connected on 5G SA"
+                connected -> "Connected on 5G NSA (the NR leg rides an LTE anchor)"
                 else -> "No NR cell registered. If everything above passes, the modem is refusing EN-DC."
             },
             status = when {
                 radio == null -> CheckStatus.UNKNOWN
-                nrCell != null -> CheckStatus.PASS
+                connected -> CheckStatus.PASS
                 else -> CheckStatus.FAIL
             },
         )

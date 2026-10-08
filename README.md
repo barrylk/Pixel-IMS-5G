@@ -4,12 +4,22 @@ An experimental root- or Shizuku-powered IMS and radio configuration app for Goo
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current public release: `2.1.0` (`v2.1.0`). The app now **opens on the answer**: a Setup screen that says
+Current public release: `2.2.0` (`v2.2.0`). The app now **opens on the answer**: a Setup screen that says
 whether 5G is working on this SIM, which check is blocking it, and offers the fix for that check. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
 ## Changelog
+
+### 2.2.0 - liquid glass, the modem patch up front, and issue fixes
+
+- **Liquid glass UI** in light and dark, with an in-app System / Light / Dark switch in the top bar.
+- **The 5G regional modem patch leads Setup** as soon as root is granted, with its prerequisites checked and one install button. Every install goes through the confirmation dialog.
+- **KernelSU and APatch** can install the modem patch, not only Magisk ([#13](https://github.com/barrylk/Pixel-IMS-5G/issues/13)).
+- **Reapply after reboot** for Shizuku mode, opt-in on SIM Config ([#6](https://github.com/barrylk/Pixel-IMS-5G/issues/6)).
+- **Fixed:** the app crashing after applying a setting on Android 17 QPR2 ([#7](https://github.com/barrylk/Pixel-IMS-5G/issues/7)), and settings wrongly reported as "did not accept" ([#14](https://github.com/barrylk/Pixel-IMS-5G/issues/14)).
+- **Fixed:** the modem patch failing with "Unable to find app for caller" ([#15](https://github.com/barrylk/Pixel-IMS-5G/issues/15)); install errors now show on the card.
+- **Fixed:** NSA 5G reported as not connected; root mode passing the access check through a Shizuku grant; pages stuck on "no SIM" when SIMs loaded late; buttons left disabled after rotating mid-action.
 
 ### [2.1.0](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v2.1.0) - task-first setup
 

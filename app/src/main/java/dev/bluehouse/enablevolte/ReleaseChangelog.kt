@@ -21,6 +21,58 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.2.0" ->
+                InstalledChangelog(
+                    version = "2.2.0",
+                    items =
+                        listOf(
+                            ChangelogItem(
+                                title = "Liquid glass, light and dark",
+                                detail = "Panels are now translucent glass over a lit background, with a specular rim and highlight. The floating tab bar has a glass lens that slides between tabs. A new button in the top bar switches between System, Light and Dark.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "The modem patch leads Home for root users",
+                                detail = "As soon as root is granted, the 5G regional modem patch is the first card on Setup, with its prerequisites checked and one install button. Once active it shrinks to a single line.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "KernelSU and APatch",
+                                detail = "The regional modem patch now installs with KernelSU (with a mounting metamodule such as mountify) and APatch, not only Magisk.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Reapply after reboot (Shizuku)",
+                                detail = "An opt-in switch on SIM Config saves your changes and reapplies them once Shizuku is running after a reboot.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "No more crash when applying a setting on Android 17",
+                                detail = "Android 17 QPR2 changed a system call the app made after every change, which crashed the app even though the setting had applied. That call is now handled safely.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "Settings no longer report 'did not accept' by mistake",
+                                detail = "The app checked the result before Android had finished applying it. It now waits for the change to land.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "Modem patch installs on Android 15 builds that refused it",
+                                detail = "The installer failed with 'Unable to find app for caller' when opening the modem database as root. Failures are now shown on the card instead of doing nothing.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "NSA 5G counts as connected",
+                                detail = "Setup no longer reports 5G as failing while the phone is on NSA 5G.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                            ChangelogItem(
+                                title = "The modem patch always asks first",
+                                detail = "Every install, from any screen, now goes through the confirmation dialog.",
+                                tone = ChangelogTone.IMPORTANT,
+                            ),
+                        ),
+                )
             "2.1.0" ->
                 InstalledChangelog(
                     version = "2.1.0",

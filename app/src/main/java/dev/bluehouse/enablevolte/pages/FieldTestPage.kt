@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,9 +65,18 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedSubId by rememberSaveable { mutableStateOf(subscriptions.firstOrNull()?.subscriptionId ?: -1) }
-    val selectedSubscription = subscriptions.firstOrNull { it.subscriptionId == selectedSubId }
-    var runningMode by rememberSaveable { mutableStateOf<String?>(null) }
-    var progress by rememberSaveable { mutableStateOf(0) }
+    // Subscriptions can arrive (or change) after this page opens; never stay pinned to a missing SIM.
+    LaunchedEffect(subscriptions) {
+        if (subscriptions.none { it.subscriptionId == selectedSubId }) {
+            selectedSubId = subscriptions.firstOrNull()?.subscriptionId ?: -1
+        }
+    }
+    // Subscriptions arrive after the first frame, so a saved -1 must not pin the page to "no SIM".
+    val selectedSubscription = subscriptions.firstOrNull { it.subscriptionId == selectedSubId } ?: subscriptions.firstOrNull()
+    // Not saveable: the test's coroutine does not survive the page being recreated, and a
+    // restored "running" flag would leave both start buttons disabled with nothing running.
+    var runningMode by remember { mutableStateOf<String?>(null) }
+    var progress by remember { mutableStateOf(0) }
     var result by remember { mutableStateOf<FieldTestResult?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -218,7 +228,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             subscriptions.forEach { subscription ->
                 FilterChip(
-                    selected = selectedSubId == subscription.subscriptionId,
+                    selected = selectedSubscription?.subscriptionId == subscription.subscriptionId,
                     onClick = { if (runningMode == null) selectedSubId = subscription.subscriptionId },
                     label = { Text(subscription.uniqueName) },
                 )
