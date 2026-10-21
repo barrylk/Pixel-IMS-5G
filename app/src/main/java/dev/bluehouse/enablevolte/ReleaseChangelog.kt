@@ -21,6 +21,22 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.2.1" ->
+                InstalledChangelog(
+                    version = "2.2.1",
+                    items = listOf(
+                        ChangelogItem(
+                            title = "Accurate field-test callback status",
+                            detail = "A failed callback registration is no longer described as successful. Timed polling remains the primary evidence when callbacks are unavailable.",
+                            tone = ChangelogTone.FIX,
+                        ),
+                        ChangelogItem(
+                            title = "Clearer evidence warnings",
+                            detail = "Reports distinguish missing serving-cell observations, conflicting CellInfo, and unmatched device-global physical channels. An unrelated physical-channel snapshot no longer implies a CellInfo conflict.",
+                            tone = ChangelogTone.FIX,
+                        ),
+                    ),
+                )
             "2.2.0" ->
                 InstalledChangelog(
                     version = "2.2.0",

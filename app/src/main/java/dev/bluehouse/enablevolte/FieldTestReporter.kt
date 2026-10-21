@@ -564,15 +564,7 @@ object FieldTestReporter {
             }
             appendLine()
             appendLine("LIVE TELEPHONY CALLBACK TIMELINE")
-            if (eventLog.isEmpty()) {
-                appendLine(
-                    "No callback events were delivered. Registration succeeded, but Android callbacks report " +
-                        "changes rather than guaranteeing an initial snapshot; the timed polling samples remain " +
-                        "the primary evidence.",
-                )
-            } else {
-                eventLog.forEach(::appendLine)
-            }
+            appendLine(callbackTimelineSummary(callbackRegistered, eventLog))
             appendLine()
             appendLine("AUTOMATIC INTERPRETATION")
             when {
@@ -645,22 +637,13 @@ object FieldTestReporter {
                             "transitioning IMS registration during the test."
                 },
             )
-            if (
-                evidenceQuality.any { it.selectedRegisteredCells == 0 } ||
-                evidenceQuality.any { it.channelAgreement == false || it.bandAgreement == false } ||
-                evidenceQuality.any { it.foreignRegisteredCells > 0 } ||
-                (
-                    physicalQuality.entries > 0 &&
-                        physicalQuality.matchingSelectedServingCells == 0
-                    )
-            ) {
-                appendLine(
-                    "Evidence warning: Android returned conflicting or cross-SIM CellInfo in part of this test. " +
-                        "The selected subscription's ServiceState/NetworkRegistrationInfo drives the verdict; " +
-                        "conflicting CellInfo and device-global root physical channels are retained for debugging " +
-                        "but not treated as selected-SIM proof.",
-                )
-            }
+            evidenceWarnings(
+                missingServingCells = evidenceQuality.any { it.selectedRegisteredCells == 0 },
+                conflictingCellInfo = evidenceQuality.any {
+                    it.channelAgreement == false || it.bandAgreement == false || it.foreignRegisteredCells > 0
+                },
+                unmatchedPhysicalChannels = physicalQuality.entries > 0 && physicalQuality.matchingSelectedServingCells == 0,
+            ).forEach(::appendLine)
             appendLine()
             appendLine("ROOT-ONLY TELEPHONY EVIDENCE")
             if (PrivilegeManager.activeMode == PrivilegeMode.ROOT && PrivilegeManager.isRootReady()) {
@@ -729,6 +712,48 @@ object FieldTestReporter {
             channelAgreement = channelAgreement,
             bandAgreement = bandAgreement,
         )
+    }
+
+    internal fun callbackTimelineSummary(callbackRegistered: Boolean, events: List<String>): String =
+        when {
+            !callbackRegistered -> {
+                val notice = "Telephony callback registration failed. Live callback coverage is unavailable; " +
+                    "the timed polling samples remain the primary evidence."
+                (listOf(notice) + events).joinToString("\n")
+            }
+            events.isEmpty() ->
+                "No callback events were delivered. Registration succeeded, but Android callbacks report " +
+                    "changes rather than guaranteeing an initial snapshot; the timed polling samples remain " +
+                    "the primary evidence."
+            else -> events.joinToString("\n")
+        }
+
+    internal fun evidenceWarnings(
+        missingServingCells: Boolean,
+        conflictingCellInfo: Boolean,
+        unmatchedPhysicalChannels: Boolean,
+    ): List<String> = buildList {
+        if (missingServingCells) {
+            add(
+                "Evidence warning: CellInfo did not expose a registered cell matching the selected " +
+                    "subscription's operational PLMN in some samples. Missing evidence is not proof of " +
+                    "a disagreement; ServiceState/NetworkRegistrationInfo drives the verdict.",
+            )
+        }
+        if (conflictingCellInfo) {
+            add(
+                "Evidence warning: Android returned conflicting or cross-SIM CellInfo in part of this test. " +
+                    "The selected subscription's ServiceState/NetworkRegistrationInfo drives the verdict; " +
+                    "conflicting CellInfo is retained for debugging, not treated as selected-SIM proof.",
+            )
+        }
+        if (unmatchedPhysicalChannels) {
+            add(
+                "Evidence warning: The device-global PhysicalChannelConfig entries did not match the " +
+                    "selected SIM's serving cells. These entries may describe another SIM or a different " +
+                    "capture time; they are not selected-SIM proof and do not establish a CellInfo conflict.",
+            )
+        }
     }
 
     private fun physicalEvidenceQuality(
