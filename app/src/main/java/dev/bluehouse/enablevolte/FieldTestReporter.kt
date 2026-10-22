@@ -616,7 +616,10 @@ object FieldTestReporter {
                     "carrier NSA=${nrModes.contains(1)}; carrier SA=${nrModes.contains(2)}; " +
                     "NR dual connectivity=${nrDualConnectivity ?: "unavailable"}; " +
                     "radio HAL EN-DC control=${nrHalCapability ?: "unavailable"}; " +
-                    "regional modem patch=${regionalPatch?.installed ?: "not applicable"}",
+                    "regional modem patch installed=${regionalPatch?.installed ?: "not applicable"}, " +
+                        "active=${regionalPatch?.active ?: "not applicable"}, " +
+                        "method=${regionalPatch?.mountMethod.orEmpty()}, " +
+                        "boot-result=${regionalPatch?.bootMountStatus.orEmpty()}",
             )
             appendLine(
                 if (caSamples > 0) {
@@ -679,7 +682,7 @@ object FieldTestReporter {
                             },
                     )
                 }
-                listOf("physical", "carrier", "properties").forEach { source ->
+                listOf("physical", "carrier", "properties", "overlay").forEach { source ->
                     appendLine("[$source-end-snapshot-device-global]")
                     appendLine(rootAtEnd[source]?.ifBlank { "No matching lines." } ?: "Unavailable")
                 }
@@ -848,6 +851,7 @@ object FieldTestReporter {
         "registry",
         "physical",
         "radio",
+        "overlay",
     )
 
     private val REPORT_SENSITIVE_FIELD = Regex(

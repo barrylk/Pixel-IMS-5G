@@ -365,14 +365,22 @@ fun PixelIMSApp(
             )
         }
     }
-    if (selectedPrivilegeMode == null || privilegeError != null) {
+    if (selectedPrivilegeMode == null || privilegeError != null || privilegeConnecting) {
         AlertDialog(
             onDismissRequest = {},
             title = { Text(stringResource(R.string.choose_access_mode)) },
             text = {
-                Text(
-                    privilegeError ?: stringResource(R.string.choose_access_mode_message),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (privilegeConnecting) stringResource(R.string.connecting)
+                        else privilegeError ?: stringResource(R.string.choose_access_mode_message),
+                    )
+                    Text(
+                        "Pixel IMS 5G ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             },
             confirmButton = {
                 Button(
@@ -400,7 +408,10 @@ fun PixelIMSApp(
             },
         )
     }
-    if (selectedPrivilegeMode != null && privilegeError == null) {
+    if (
+        selectedPrivilegeMode != null && privilegeError == null && !privilegeConnecting &&
+        (selectedPrivilegeMode != PrivilegeMode.ROOT.name || rootGranted)
+    ) {
         whatsNew?.let { changelog ->
             WhatsNewDialog(
                 changelog = changelog,

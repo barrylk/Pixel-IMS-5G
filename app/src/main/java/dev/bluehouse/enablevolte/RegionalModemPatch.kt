@@ -7,6 +7,10 @@ data class RegionalModemPatchStatus(
     val magiskAvailable: Boolean,
     val sourceAvailable: Boolean,
     val installed: Boolean,
+    /** True only when the live vendor database matches the staged patched database. */
+    val active: Boolean,
+    /** True when this module has its own boot mount, or an overlay mounter is available. */
+    val mountingReady: Boolean,
     val removalPending: Boolean,
     val rebootRequired: Boolean,
     val device: String,
@@ -15,6 +19,8 @@ data class RegionalModemPatchStatus(
     val message: String,
     /** Magisk, KernelSU or APatch; empty when none was found or the service predates 2.2. */
     val rootManager: String = "",
+    val mountMethod: String = "",
+    val bootMountStatus: String = "",
 ) {
     companion object {
         fun fromJson(value: String): RegionalModemPatchStatus {
@@ -24,6 +30,8 @@ data class RegionalModemPatchStatus(
                 magiskAvailable = json.optBoolean("magiskAvailable"),
                 sourceAvailable = json.optBoolean("sourceAvailable"),
                 installed = json.optBoolean("installed"),
+                active = json.optBoolean("active"),
+                mountingReady = json.optBoolean("mountingReady", true),
                 removalPending = json.optBoolean("removalPending"),
                 rebootRequired = json.optBoolean("rebootRequired"),
                 device = json.optString("device"),
@@ -31,6 +39,8 @@ data class RegionalModemPatchStatus(
                 patchedSha256 = json.optString("patchedSha256"),
                 message = json.optString("message"),
                 rootManager = json.optString("rootManager"),
+                mountMethod = json.optString("mountMethod"),
+                bootMountStatus = json.optString("bootMountStatus"),
             )
         }
 
@@ -39,6 +49,8 @@ data class RegionalModemPatchStatus(
             magiskAvailable = false,
             sourceAvailable = false,
             installed = false,
+            active = false,
+            mountingReady = false,
             removalPending = false,
             rebootRequired = false,
             device = "",

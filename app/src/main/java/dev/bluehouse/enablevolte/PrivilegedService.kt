@@ -61,6 +61,7 @@ class PrivilegedService : RootService() {
 
         override fun getTelephonyDiagnosticSnapshot(kind: String): String {
             Log.i(TAG, "Reading root telephony diagnostic: $kind")
+            if (kind == "overlay") return readRegionalOverlayEvidence()
             val command = DIAGNOSTIC_COMMANDS[kind] ?: return "Unsupported diagnostic source"
             val result = runCommand(*command)
             if (result.exitCode != 0) return "Diagnostic source failed (${result.exitCode})"
@@ -329,7 +330,12 @@ class PrivilegedService : RootService() {
         private val target: IBinder,
     ) : Binder() {
         override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean =
-            target.transact(code, data, reply, flags)
+            withClearedBinderIdentity(
+                clearIdentity = Binder::clearCallingIdentity,
+                restoreIdentity = Binder::restoreCallingIdentity,
+            ) {
+                target.transact(code, data, reply, flags)
+            }
     }
 
     companion object {
@@ -536,6 +542,7 @@ class PrivilegedService : RootService() {
             }
             val manager = detectModuleManager()
                 ?: error("No module manager (Magisk, KernelSU or APatch) was detected. The modem database patch needs one.")
+            val singleFileMount = manager == ModuleManager.KERNELSU
             val source = File(REGIONAL_SOURCE_DB)
             check(source.isFile) { "The Tensor carrier database was not found at $REGIONAL_SOURCE_DB." }
 
@@ -573,8 +580,8 @@ class PrivilegedService : RootService() {
                 """
                 id=pixelims5g_region
                 name=Pixel IMS 5G Regional Modem Compatibility
-                version=1
-                versionCode=1
+                version=${if (singleFileMount) 2 else 1}
+                versionCode=${if (singleFileMount) 2 else 1}
                 author=Nadeeja Nirmala
                 description=Systemless, reversible Tensor cfg.db wildcard/PTCRB compatibility mapping.
                 """.trimIndent() + "\n",
@@ -588,9 +595,20 @@ class PrivilegedService : RootService() {
             File(pendingModule, ".pending_reboot").writeText("")
             File(pendingModule, "source.sha256").writeText("$sourceSha\n")
             File(pendingModule, "patched.sha256").writeText("$patchedSha\n")
+            if (singleFileMount) {
+                // This module owns only a file bind; never expose a system/ tree to a
+                // metamodule, even if the user later installs a global mounter.
+                File(pendingModule, "skip_mount").writeText("")
+                File(pendingModule, "mount_method").writeText("single-file-bind\n")
+                val bootScript = File(pendingModule, "post-fs-data.sh")
+                bootScript.writeText(regionalSingleFileBootScript())
+                check(runCommand("/system/bin/chmod", "0755", bootScript.path).exitCode == 0) {
+                    "Unable to make the single-file boot mount executable."
+                }
+            }
             val targetDatabase = File(
                 pendingModule,
-                "system/vendor/firmware/carrierconfig/cfg.db",
+                if (singleFileMount) "files/cfg.db" else "system/vendor/firmware/carrierconfig/cfg.db",
             ).apply {
                 check(parentFile?.mkdirs() == true || parentFile?.isDirectory == true) {
                     "Unable to create the systemless vendor overlay."
@@ -618,14 +636,21 @@ class PrivilegedService : RootService() {
             check(runCommand("/system/bin/chmod", "0644", targetDatabase.path).exitCode == 0) {
                 "Unable to set modem database permissions."
             }
-            check(
-                runCommand(
-                    "/system/bin/chcon",
-                    "u:object_r:vendor_fw_file:s0",
-                    targetDatabase.path,
-                ).exitCode == 0,
-            ) {
-                "Unable to assign the vendor firmware SELinux label."
+            // OverlayFS exposes the highest directory's metadata. A single correctly labelled
+            // cfg.db is insufficient if its firmware ancestors retain data/adb labels.
+            // Copy labels only onto the staged module, never onto the live vendor tree.
+            val copyLabel: (String, String) -> Boolean = { reference, stagedPath ->
+                val context = readFileSelinuxContext(reference)
+                context != null &&
+                    runCommand("/system/bin/chcon", context, stagedPath).exitCode == 0 &&
+                    readFileSelinuxContext(stagedPath) == context
+            }
+            if (singleFileMount) {
+                check(copyLabel(REGIONAL_SOURCE_DB, targetDatabase.path)) {
+                    "Unable to preserve the live database SELinux label; no module was activated."
+                }
+            } else {
+                applyRegionalOverlayLabels(pendingModule.path, copyLabel)
             }
 
             val moduleDir = File(REGIONAL_MODULE_DIR)
@@ -638,12 +663,11 @@ class PrivilegedService : RootService() {
 
             return regionalPatchStatus(
                 rebootRequired = true,
-                message = "Validated systemless modem patch installed. Reboot to load it." +
-                    if (manager == ModuleManager.KERNELSU) {
-                        " KernelSU needs a mounting metamodule (for example mountify or meta-overlayfs) to apply it."
-                    } else {
-                        ""
-                    },
+                message = if (singleFileMount) {
+                    "Verified single-file modem module installed. Reboot to bind only cfg.db. No metamodule is required."
+                } else {
+                    "Validated systemless modem patch installed. Reboot to load it."
+                },
             ).toString()
         }
 
@@ -715,35 +739,68 @@ class PrivilegedService : RootService() {
         ): JSONObject {
             val device = Build.DEVICE.lowercase()
             val module = File(REGIONAL_MODULE_DIR)
-            val database = File(module, "system/vendor/firmware/carrierconfig/cfg.db")
+            val method = File(module, "mount_method").readSmallText()
+            val database = regionalModuleDatabase(module)
+            val manager = detectModuleManager()
             val removalPending = File(module, "remove").isFile
             val pendingReboot = File(module, ".pending_reboot").isFile
+            val patchedSha = File(module, "patched.sha256").readSmallText()
+            val liveSha = runCatching {
+                File(REGIONAL_SOURCE_DB).takeIf { it.isFile && patchedSha.isNotBlank() }?.sha256().orEmpty()
+            }.getOrDefault("")
+            val active = patchedSha.isNotBlank() && liveSha.equals(patchedSha, ignoreCase = true)
+            val mountingReady = method == "single-file-bind" ||
+                manager != ModuleManager.KERNELSU || File(KERNELSU_METAMODULE).exists()
             return JSONObject()
                 .put("supported", device in TENSOR_DEVICES)
-                .put("magiskAvailable", detectModuleManager() != null)
-                .put("rootManager", detectModuleManager()?.label.orEmpty())
+                .put("magiskAvailable", manager != null)
+                .put("rootManager", manager?.label.orEmpty())
                 .put("sourceAvailable", File(REGIONAL_SOURCE_DB).isFile)
                 .put("installed", database.isFile)
+                .put("active", active)
+                .put("mountingReady", mountingReady)
+                .put("mountMethod", method)
+                .put("bootMountStatus", File(module, "bind.status").readSmallText())
                 .put("removalPending", removalPending)
                 .put("rebootRequired", rebootRequired ?: (pendingReboot || removalPending))
                 .put("device", device)
                 .put("sourceSha256", File(module, "source.sha256").readSmallText())
-                .put("patchedSha256", File(module, "patched.sha256").readSmallText())
+                .put("patchedSha256", patchedSha)
                 .put("message", message)
         }
 
         private fun regionalPatchStatusMessage(): String {
             val device = Build.DEVICE.lowercase()
             val module = File(REGIONAL_MODULE_DIR)
+            val database = regionalModuleDatabase(module)
+            val method = File(module, "mount_method").readSmallText()
+            val bootStatus = File(module, "bind.status").readSmallText()
+            val manager = detectModuleManager()
+            val patchedSha = File(module, "patched.sha256").readSmallText()
+            val active = runCatching {
+                patchedSha.isNotBlank() && File(REGIONAL_SOURCE_DB).sha256().equals(patchedSha, ignoreCase = true)
+            }.getOrDefault(false)
             return when {
                 device !in TENSOR_DEVICES -> "This device is not in the validated Tensor Pixel list."
-                detectModuleManager() == null ->
+                manager == null ->
                     "A module manager (Magisk, KernelSU or APatch) is required; Shizuku cannot overlay vendor firmware."
                 !File(REGIONAL_SOURCE_DB).isFile -> "The Tensor carrier database was not found on this firmware."
                 File(module, "remove").isFile -> "Removal is scheduled. Reboot to restore the stock modem database."
                 File(module, ".pending_reboot").isFile -> "Patch installed. Reboot is required before it becomes active."
-                File(module, "system/vendor/firmware/carrierconfig/cfg.db").isFile ->
-                    "The systemless regional modem compatibility patch is installed."
+                database.isFile && active ->
+                    "The patched regional carrier database is mounted."
+                database.isFile && method == "single-file-bind" ->
+                    "Single-file boot mount is inactive. " + if (bootStatus.isNotBlank()) {
+                        "Boot result: $bootStatus."
+                    } else {
+                        "Confirm the module is enabled in KernelSU and reboot. No metamodule is required."
+                    }
+                database.isFile && manager == ModuleManager.KERNELSU && !File(KERNELSU_METAMODULE).exists() ->
+                    "The old overlay module is inactive. Tap Revalidate for this firmware to replace it with " +
+                        "a single-file boot mount, then reboot. The replacement needs no metamodule."
+                database.isFile ->
+                    "The patch module is installed, but the live modem database does not match it. Reboot and check " +
+                        "that your root manager is mounting system modules."
                 else -> "Ready for schema validation and systemless installation."
             }
         }
@@ -752,6 +809,49 @@ class PrivilegedService : RootService() {
             File("/data/local/tmp/pixelims5g").apply {
                 check(mkdirs() || isDirectory) { "Unable to access the root staging directory." }
             }
+
+        private fun regionalModuleDatabase(module: File): File =
+            if (File(module, "mount_method").readSmallText() == "single-file-bind") {
+                File(module, "files/cfg.db")
+            } else {
+                File(module, "system/vendor/firmware/carrierconfig/cfg.db")
+            }
+
+        private fun readFileSelinuxContext(path: String): String? {
+            val listing = runCommand("/system/bin/ls", "-Zd", path)
+            if (listing.exitCode != 0) return null
+            return listing.output.split(Regex("\\s+")).firstOrNull {
+                it.matches(Regex("u:object_r:[a-zA-Z0-9_]+:s0(?::[a-zA-Z0-9_,.-]+)?"))
+            }
+        }
+
+        /** Read-only evidence; collecting it does not mount, relabel, install or enable anything. */
+        private fun readRegionalOverlayEvidence(): String = buildString {
+            val module = File(REGIONAL_MODULE_DIR)
+            appendLine("rootManager=${detectModuleManager()?.label.orEmpty()}")
+            appendLine("metamodulePresent=${File(KERNELSU_METAMODULE).exists()}")
+            appendLine("moduleDisabled=${File(module, "disable").exists()}")
+            appendLine("moduleRemovalPending=${File(module, "remove").exists()}")
+            appendLine("moduleSkipMount=${File(module, "skip_mount").exists()}")
+            appendLine("mountMethod=${File(module, "mount_method").readSmallText()}")
+            appendLine("bootMountStatus=${File(module, "bind.status").readSmallText()}")
+            appendLine("singleFileSourceLabel=${readFileSelinuxContext(File(module, "files/cfg.db").path)}")
+            regionalOverlayLabelPaths.forEach { (reference, relative) ->
+                appendLine("$reference: live=${readFileSelinuxContext(reference) ?: "unreadable"}, " +
+                    "staged=${readFileSelinuxContext("$REGIONAL_MODULE_DIR/$relative") ?: "unreadable"}")
+            }
+            listOf("/proc/self/mountinfo", "/proc/1/mountinfo").forEach { path ->
+                appendLine("[$path vendor/system/overlay mounts]")
+                runCatching {
+                    File(path).useLines { lines ->
+                        lines.filter {
+                            it.contains("/vendor") || it.contains("/system") ||
+                                it.contains("mountify") || it.contains(" - overlay ")
+                        }.take(40).forEach { appendLine(it) }
+                    }
+                }.onFailure { appendLine("Unavailable: ${it.javaClass.simpleName}") }
+            }
+        }
 
         private fun findExecutable(paths: List<String>): String? =
             paths.firstOrNull { File(it).canExecute() }
@@ -796,6 +896,7 @@ class PrivilegedService : RootService() {
 
         private const val REGIONAL_SOURCE_DB = "/vendor/firmware/carrierconfig/cfg.db"
         private const val REGIONAL_MODULE_DIR = "/data/adb/modules/pixelims5g_region"
+        private const val KERNELSU_METAMODULE = "/data/adb/metamodule"
         private val MAGISK_CANDIDATES = listOf(
             "/system_ext/bin/magisk",
             "/sbin/magisk",

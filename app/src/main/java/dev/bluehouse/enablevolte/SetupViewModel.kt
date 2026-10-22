@@ -241,7 +241,8 @@ class SetupViewModel(
                     !patch.supported -> "Not applicable to this device"
                     patch.removalPending -> "Removal is pending — reboot to finish"
                     patch.installed && patch.rebootRequired -> "Installed. Reboot for the modem to load it"
-                    patch.installed -> "Installed"
+                    patch.installed && patch.active -> "Patched carrier database mounted"
+                    patch.installed -> patch.message.ifBlank { "Installed but inactive" }
                     !patch.magiskAvailable -> "No Magisk, KernelSU or APatch was found, so the systemless patch cannot be installed"
                     !patch.sourceAvailable -> "This firmware's modem database could not be read, so there is nothing to patch"
                     else -> "Not installed. This is the step that makes the modem accept EN-DC"

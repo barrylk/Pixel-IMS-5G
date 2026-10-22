@@ -7,6 +7,14 @@ import org.junit.Test
 
 class ReleaseChangelogTest {
     @Test
+    fun finalKernelSuBuildHasBundledChangelog() {
+        val changelog = ReleaseChangelogCatalog.forVersion("2.2.5")
+
+        assertEquals("2.2.5", changelog?.version)
+        assertTrue(changelog?.items?.any { it.title.contains("KernelSU") } == true)
+    }
+
+    @Test
     fun currentReleaseHasStructuredHighlightedItems() {
         val changelog = ReleaseChangelogCatalog.forVersion("v1.0.6")
 

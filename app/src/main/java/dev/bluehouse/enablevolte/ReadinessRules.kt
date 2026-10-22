@@ -19,7 +19,9 @@ object ReadinessRules {
         !patch.supported -> CheckStatus.WARN
         // Installed but not yet loaded by the modem, or on its way out: neither is done.
         patch.removalPending || patch.rebootRequired -> CheckStatus.WARN
-        patch.installed -> CheckStatus.PASS
+        patch.installed && patch.active -> CheckStatus.PASS
+        patch.installed && patch.bootMountStatus.isNotBlank() && patch.bootMountStatus != "active" -> CheckStatus.FAIL
+        patch.installed -> CheckStatus.WARN
         else -> CheckStatus.FAIL
     }
 
@@ -33,7 +35,8 @@ object ReadinessRules {
     fun canRevalidatePatch(patch: RegionalModemPatchStatus): Boolean =
         patch.supported &&
             patch.installed &&
-            patch.rebootRequired &&
+            !patch.active &&
+            (patch.rebootRequired || patch.rootManager == "KernelSU") &&
             !patch.removalPending &&
             patch.magiskAvailable &&
             patch.sourceAvailable

@@ -21,6 +21,28 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.2.5" ->
+                InstalledChangelog(
+                    version = "2.2.5",
+                    items =
+                        listOf(
+                            ChangelogItem(
+                                title = "KernelSU works without a metamodule",
+                                detail = "The regional modem patch now mounts only cfg.db at boot through KernelSU's native module support. No directory overlay or mounting metamodule is required.",
+                                tone = ChangelogTone.FEATURE,
+                            ),
+                            ChangelogItem(
+                                title = "Verified read-only single-file mount",
+                                detail = "The boot script verifies the source and target, remounts the bind read-only, records its status, and rolls back instead of leaving a partial mount when validation fails.",
+                                tone = ChangelogTone.IMPROVEMENT,
+                            ),
+                            ChangelogItem(
+                                title = "Clearer patch state after firmware updates",
+                                detail = "Setup now distinguishes an active patch from a staged or stale module and offers Revalidate when the modem database must be rebuilt for the current firmware.",
+                                tone = ChangelogTone.FIX,
+                            ),
+                        ),
+                )
             "2.2.0" ->
                 InstalledChangelog(
                     version = "2.2.0",

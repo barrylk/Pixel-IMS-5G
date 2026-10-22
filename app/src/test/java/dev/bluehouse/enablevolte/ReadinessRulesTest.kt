@@ -11,6 +11,8 @@ class ReadinessRulesTest {
         magisk: Boolean = true,
         source: Boolean = true,
         installed: Boolean = false,
+        active: Boolean = false,
+        mountingReady: Boolean = true,
         removalPending: Boolean = false,
         rebootRequired: Boolean = false,
     ) = RegionalModemPatchStatus(
@@ -18,6 +20,8 @@ class ReadinessRulesTest {
         magiskAvailable = magisk,
         sourceAvailable = source,
         installed = installed,
+        active = active,
+        mountingReady = mountingReady,
         removalPending = removalPending,
         rebootRequired = rebootRequired,
         device = "cheetah",
@@ -40,8 +44,21 @@ class ReadinessRulesTest {
         assertEquals(CheckStatus.WARN, ReadinessRules.patchStatus(patch(supported = false)))
         assertEquals(CheckStatus.WARN, ReadinessRules.patchStatus(patch(installed = true, rebootRequired = true)))
         assertEquals(CheckStatus.WARN, ReadinessRules.patchStatus(patch(installed = true, removalPending = true)))
-        assertEquals(CheckStatus.PASS, ReadinessRules.patchStatus(patch(installed = true)))
+        assertEquals(CheckStatus.WARN, ReadinessRules.patchStatus(patch(installed = true, active = false)))
+        assertEquals(CheckStatus.PASS, ReadinessRules.patchStatus(patch(installed = true, active = true)))
+        assertEquals(
+            CheckStatus.WARN,
+            ReadinessRules.patchStatus(patch(installed = true, active = false, mountingReady = false)),
+        )
         assertEquals(CheckStatus.FAIL, ReadinessRules.patchStatus(patch()))
+    }
+
+    @Test
+    fun bootMountFailureBlocksReadinessBeforeDiagnosingTheRadio() {
+        assertEquals(
+            CheckStatus.FAIL,
+            ReadinessRules.patchStatus(patch(installed = true).copy(bootMountStatus = "read-only bind remount failed")),
+        )
     }
 
     @Test
@@ -60,6 +77,14 @@ class ReadinessRulesTest {
         assertFalse(ReadinessRules.canRevalidatePatch(patch(installed = true)))
         assertFalse(ReadinessRules.canRevalidatePatch(patch(installed = true, rebootRequired = true, removalPending = true)))
         assertFalse(ReadinessRules.canRevalidatePatch(patch(installed = true, rebootRequired = true, source = false)))
+    }
+
+    @Test
+    fun inactiveKernelSuOverlayCanMigrateWithoutAnotherRebootMarker() {
+        assertTrue(ReadinessRules.canRevalidatePatch(patch(installed = true).copy(rootManager = "KernelSU")))
+        assertFalse(
+            ReadinessRules.canRevalidatePatch(patch(installed = true, active = true).copy(rootManager = "KernelSU")),
+        )
     }
 
     @Test

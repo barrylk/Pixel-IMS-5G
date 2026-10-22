@@ -201,7 +201,7 @@
     <string name="how_to_5g_description">Follow the path for your selected access mode. Start with NSA and Automatic bands for Sri Lankan networks, then confirm the result in Monitor or Field Test.</string>
     <string name="how_to_root_badge">ROOT • STRONGEST LOCAL FIX</string>
     <string name="how_to_root_5g_title">Enable 5G with Root</string>
-    <string name="how_to_root_5g_steps">1. On Home, choose Root and grant superuser access. The regional modem patch specifically requires Magisk.\n\n2. Open Controls → Band selection &amp; LTE+. Keep bands on Automatic, select Force NSA, and tap Force all local 5G gates.\n\n3. The 5G regional modem patch card sits at the top of Setup as soon as root is granted. Confirm the Tensor, Magisk and Modem DB checks are green, tap Validate and install patch, approve the warning, and reboot.\n\n4. Return near a known 5G site with mobile data enabled. Open Monitor or run the standard Field Test and confirm EN-DC/NR attachment. Use SA only when the carrier actually offers SA.</string>
+    <string name="how_to_root_5g_steps">1. On Home, choose Root and grant superuser access in your root manager.\n\n2. Open Controls → Band selection &amp; LTE+. Keep bands on Automatic, select Force NSA, and tap Force all local 5G gates.\n\n3. On Setup, validate and install the regional modem patch, then reboot. KernelSU uses a single-file boot mount and needs no metamodule. If an old KernelSU overlay is inactive, use Revalidate for this firmware to migrate it. Magisk and APatch use their overlays.\n\n4. Near a known 5G site, enable mobile data and check Monitor or the standard Field Test for EN-DC/NR attachment. Use SA only when the carrier offers SA.</string>
     <string name="how_to_root_5g_note">After a Pixel firmware update, remove the old regional patch before updating, reboot, then validate and install a fresh patch for the new baseband. Root cannot create tower coverage or bypass carrier/SIM authorization.</string>
     <string name="how_to_shizuku_badge">SHIZUKU • ANDROID-SIDE GATES</string>
     <string name="how_to_shizuku_5g_title">Try 5G with Shizuku</string>
@@ -326,7 +326,7 @@
     <string name="root_force_warning">Root Force snapshots the current state, removes band restrictions, enables NSA + SA in CarrierConfig, opens every readable allowed-network reason, enables IMS debug gates, and restarts IMS. It does not write modem NV/EFS. Device-specific NV profiles must match the exact Pixel model and baseband.</string>
     <string name="regional_modem_patch">Regional modem compatibility (root)</string>
     <string name="regional_patch_description">Experimental systemless Tensor modem patch. It copies this firmware’s own cfg.db, validates the SQLite schema and integrity, and maps only wildcard/PTCRB carrier entries to the firmware’s permissive profile. It does not fake the SIM country, registered PLMN, or Wi-Fi regulatory country.</string>
-    <string name="regional_patch_warning">Root with Magisk, KernelSU (plus a mounting metamodule) or APatch only. A reboot is required. Before applying a firmware update, remove this patch and reboot; after the update, validate and install a fresh copy. The installer refuses unknown layouts. This can open a local modem profile but cannot bypass Dialog authentication, tower EN-DC configuration, subscriber entitlement, or RF hardware limits.</string>
+    <string name="regional_patch_warning">KernelSU uses a verified, read-only boot bind of cfg.db and needs no metamodule. Magisk and APatch use their systemless overlay. A reboot is required. Before a firmware update, remove this patch and reboot; afterward validate a fresh copy. The installer refuses unknown layouts. A local modem profile cannot bypass carrier authentication, subscriber entitlement, tower configuration or RF limits.</string>
     <string name="regional_patch_root_only">Root mode with Magisk, KernelSU or APatch is required. This operation is unavailable through Shizuku.</string>
     <string name="shizuku_regional_profile">Regional 5G compatibility (Shizuku)</string>
     <string name="shizuku_regional_description">Applies every reversible Android-side regional gate available to the Shizuku shell: LTE + NR network policy, NSA + SA CarrierConfig, VoLTE, VoWiFi, VoNR, LTE+ and IMS visibility. It requests Automatic bands where the modem API supports it, then reads the effective regional gates back.</string>
@@ -368,7 +368,7 @@
     <string name="modem_limitations">Modem limitations</string>
     <string name="shizuku_modem_patch_limit">Important: this is not the Tensor cfg.db modem patch that made 5G work in the root comparison. Android 17 blocks UID 2000 from installing a vendor/Magisk overlay. If the modem profile still rejects EN-DC after these gates pass, the same modem fix still requires root.</string>
     <string name="regional_patch_confirm_title">Install regional modem patch?</string>
-    <string name="regional_patch_confirm_message">The app will validate and stage a systemless vendor carrier database overlay. The change becomes active after reboot. If service becomes unstable, return here, schedule removal, and reboot.</string>
+    <string name="regional_patch_confirm_message">The app will validate and stage a patched carrier database. On KernelSU, a boot script binds only cfg.db as read-only; no metamodule or directory overlay is used. On Magisk and APatch, the manager mounts the overlay. Reboot to activate. If service becomes unstable, disable this module in your root manager and reboot.</string>
     <string name="regional_patch_remove_confirm_title">Remove regional modem patch?</string>
     <string name="regional_patch_remove_confirm_message">Magisk will remove the systemless overlay during the next reboot and restore the stock firmware database.</string>
     <string name="install_patch">Validate and install patch</string>
@@ -448,7 +448,8 @@
     <string name="patch_card_pitch">Lets the Tensor modem accept 5G (EN-DC) on carriers its firmware does not list. Do this first, then reboot.</string>
     <string name="patch_card_checking">Checking the modem patch…</string>
     <string name="patch_card_active">Patch active</string>
-    <string name="patch_card_active_body">The modem is using the regional compatibility profile.</string>
+    <string name="patch_card_inactive">Patch inactive</string>
+    <string name="patch_card_active_body">The patched carrier database is mounted.</string>
     <string name="patch_card_reboot">Reboot to activate</string>
     <string name="patch_card_reboot_body">The patch is staged. It takes effect on the next reboot.</string>
     <string name="patch_card_removing">Removal pending</string>

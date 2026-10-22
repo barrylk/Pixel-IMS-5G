@@ -46,13 +46,14 @@ import dev.bluehouse.enablevolte.RegionalPatchViewModel
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 import dev.bluehouse.enablevolte.ui.theme.ReadoutSmall
 
-private enum class PatchPhase { CHECKING, READY, REBOOT, ACTIVE, REMOVING, UNAVAILABLE }
+private enum class PatchPhase { CHECKING, READY, REBOOT, ACTIVE, INACTIVE, REMOVING, UNAVAILABLE }
 
 private fun phaseOf(status: RegionalModemPatchStatus?, loading: Boolean): PatchPhase = when {
     status == null || (loading && status.message.isBlank()) -> PatchPhase.CHECKING
     status.removalPending -> PatchPhase.REMOVING
     status.installed && status.rebootRequired -> PatchPhase.REBOOT
-    status.installed -> PatchPhase.ACTIVE
+    status.installed && status.active -> PatchPhase.ACTIVE
+    status.installed -> PatchPhase.INACTIVE
     ReadinessRules.canInstallPatch(status) -> PatchPhase.READY
     else -> PatchPhase.UNAVAILABLE
 }
@@ -87,7 +88,7 @@ fun RegionalPatchCard(
         PatchPhase.ACTIVE -> inst.good
         PatchPhase.REBOOT, PatchPhase.REMOVING -> inst.fair
         PatchPhase.READY -> inst.ember
-        PatchPhase.UNAVAILABLE -> inst.poor
+        PatchPhase.INACTIVE, PatchPhase.UNAVAILABLE -> inst.poor
         PatchPhase.CHECKING -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val headline = when (phase) {
@@ -95,6 +96,7 @@ fun RegionalPatchCard(
         PatchPhase.READY -> stringResource(R.string.patch_card_ready)
         PatchPhase.REBOOT -> stringResource(R.string.patch_card_reboot)
         PatchPhase.ACTIVE -> stringResource(R.string.patch_card_active)
+        PatchPhase.INACTIVE -> stringResource(R.string.patch_card_inactive)
         PatchPhase.REMOVING -> stringResource(R.string.patch_card_removing)
         PatchPhase.UNAVAILABLE -> stringResource(R.string.patch_card_unavailable)
     }
@@ -144,9 +146,10 @@ fun RegionalPatchCard(
                 }
                 if (phase == PatchPhase.CHECKING || ui.busy) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    SignalChip(label = headline, tone = tone, dot = true)
                 }
+            }
+            if (phase != PatchPhase.CHECKING && !ui.busy) {
+                SignalChip(label = headline, tone = tone, dot = true)
             }
 
             Text(
@@ -154,7 +157,7 @@ fun RegionalPatchCard(
                     PatchPhase.REBOOT -> stringResource(R.string.patch_card_reboot_body)
                     PatchPhase.REMOVING -> stringResource(R.string.patch_card_removing_body)
                     PatchPhase.ACTIVE -> stringResource(R.string.patch_card_active_body)
-                    PatchPhase.UNAVAILABLE -> status?.message.orEmpty()
+                    PatchPhase.INACTIVE, PatchPhase.UNAVAILABLE -> status?.message.orEmpty()
                     else -> stringResource(R.string.patch_card_pitch)
                 },
                 style = MaterialTheme.typography.bodyMedium,
