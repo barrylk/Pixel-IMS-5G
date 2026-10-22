@@ -7,6 +7,17 @@ import org.junit.Test
 
 class ReleaseChangelogTest {
     @Test
+    fun combinedReleaseIncludesRootAndDiagnosticFixes() {
+        val changelog = ReleaseChangelogCatalog.forVersion("v2.2.6")
+
+        assertEquals("2.2.6", changelog?.version)
+        assertTrue(changelog.orEmptyItems().any { it.title.contains("KernelSU") })
+        assertTrue(changelog.orEmptyItems().any { it.title.contains("Magisk") })
+        assertTrue(changelog.orEmptyItems().any { it.title.contains("callback") })
+        assertTrue(changelog.orEmptyItems().any { it.title.contains("evidence") })
+    }
+
+    @Test
     fun finalKernelSuBuildHasBundledChangelog() {
         val changelog = ReleaseChangelogCatalog.forVersion("2.2.5")
 

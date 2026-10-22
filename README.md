@@ -12,12 +12,21 @@ An experimental root- or Shizuku-powered IMS and radio configuration app for Goo
 
 Android application ID: `com.nirmala.pixel5gims`.
 
-Current public release: `2.2.0` (`v2.2.0`). The app now **opens on the answer**: a Setup screen that says
+Current public release: `2.2.6` (`v2.2.6`). The app now **opens on the answer**: a Setup screen that says
 whether 5G is working on this SIM, which check is blocking it, and offers the fix for that check. The one-time uninstall/reinstall notice applies specifically
 to version `0.12.6`, where the application ID changed. Existing `0.12.6` installations
 can update normally to later versions.
 
 ## Changelog
+
+### 2.2.6 - combined root compatibility and field-test fixes
+
+- Combines the working 2.2.5 root build with all diagnostic fixes from the public 2.2.1 release; version code 38 upgrades both build lines.
+- Preserves shell-resolved root startup, queued permission requests and Binder identity handling for KernelSU and Magisk.
+- KernelSU binds only `cfg.db` at boot without a metamodule, with hash/SELinux checks, a read-only remount and rollback on failure. Magisk and APatch keep their existing installation paths.
+- Setup distinguishes active, staged and stale patches and supports firmware revalidation.
+- Field-test reports distinguish callback registration failure from no delivered events, and separate missing serving cells, conflicting CellInfo and unmatched device-global physical channels.
+- See the [release notes](.github/release-notes/v2.2.6.md) for update signing and revalidation instructions.
 
 ### 2.2.0 - liquid glass, the modem patch up front, and issue fixes
 

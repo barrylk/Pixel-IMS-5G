@@ -21,6 +21,32 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.2.6" ->
+                InstalledChangelog(
+                    version = "2.2.6",
+                    items = listOf(
+                        ChangelogItem(
+                            title = "KernelSU and Magisk root compatibility",
+                            detail = "Includes the working 2.2.5 root startup, queued permission requests and Binder identity fixes. KernelSU mounts only cfg.db at boot without a metamodule; Magisk keeps its existing module path.",
+                            tone = ChangelogTone.FIX,
+                        ),
+                        ChangelogItem(
+                            title = "Verified mount and firmware revalidation",
+                            detail = "Preserves read-only single-file mounting, hash and SELinux checks, rollback on failure, and clear active or stale patch status after firmware updates.",
+                            tone = ChangelogTone.IMPROVEMENT,
+                        ),
+                        ChangelogItem(
+                            title = "Accurate field-test callback status",
+                            detail = "Includes the 2.2.1 fix distinguishing failed callback registration from successful registration with no events. Timed polling remains the primary evidence when callbacks are unavailable.",
+                            tone = ChangelogTone.FIX,
+                        ),
+                        ChangelogItem(
+                            title = "Precise field-test evidence warnings",
+                            detail = "Includes the 2.2.1 fix separating missing serving cells, conflicting CellInfo and unmatched device-global physical channels, without treating another SIM's evidence as selected-SIM proof.",
+                            tone = ChangelogTone.FIX,
+                        ),
+                    ),
+                )
             "2.2.5" ->
                 InstalledChangelog(
                     version = "2.2.5",
