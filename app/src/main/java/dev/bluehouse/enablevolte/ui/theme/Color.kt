@@ -19,27 +19,27 @@ import androidx.compose.ui.graphics.Color
  */
 
 // Ground — dark.
-val Void = Color(0xFF03060C)
-val Deck = Color(0xFF070C16)
-val Hull = Color(0xFF0C1422)
-val HullHigh = Color(0xFF142034)
+val Void = Color(0xFF030B13)
+val Deck = Color(0xFF07131F)
+val Hull = Color(0xFF102538)
+val HullHigh = Color(0xFF1A354A)
 
 // Ground — light.
-val Paper = Color(0xFFE8EEF6)
+val Paper = Color(0xFFECF5FC)
 val PaperHull = Color(0xFFF7FAFD)
 val PaperHullHigh = Color(0xFFE2EAF4)
 
 // Ambient light pools behind the glass.
-val PoolCyanDark = Color(0xFF00B4FF)
-val PoolVioletDark = Color(0xFF7457FF)
-val PoolEmberDark = Color(0xFFFF7A3D)
-val PoolCyanLight = Color(0xFF6FD3FF)
-val PoolVioletLight = Color(0xFFB9A4FF)
-val PoolEmberLight = Color(0xFFFFC3A0)
+val PoolCyanDark = Color(0xFF1689D3)
+val PoolVioletDark = Color(0xFF21589B)
+val PoolEmberDark = Color(0xFF16476C)
+val PoolCyanLight = Color(0xFF86D0FF)
+val PoolVioletLight = Color(0xFFBBDDF8)
+val PoolEmberLight = Color(0xFFB5D7EF)
 
 // Accents.
-val Signal = Color(0xFF3CE0FF)
-val SignalDeep = Color(0xFF0068A8)
+val Signal = Color(0xFF74BEFF)
+val SignalDeep = Color(0xFF0066CC)
 val Ember = Color(0xFFFFA23A)
 val EmberDeep = Color(0xFFA85A06)
 val Pulse = Color(0xFFFF3A5E)
@@ -69,7 +69,7 @@ val SheenDark = Color(0x8CFFFFFF)
 val SpecularDark = Color(0x2EFFFFFF)
 val CausticDark = Color(0x664FE3FF)
 val ShadeDark = Color(0x33000000)
-val ScrimDark = Color(0xB3070C16)
+val ScrimDark = Color(0xB31A354A)
 
 // Glass — light. Milk-white panes, with a darker lower rim so they lift off the paper.
 val FrostLight = Color(0x80FFFFFF)

@@ -13,8 +13,8 @@ android {
         // Every Tensor Pixel (Pixel 6 and newer) launched on Android 12 / API 31 or later.
         minSdk 31
         targetSdk 36
-        versionCode 38
-        versionName "2.2.6"
+        versionCode 39
+        versionName "2.2.7"
 
         vectorDrawables {
             useSupportLibrary true
@@ -28,6 +28,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
+            applicationIdSuffix ".preview"
+            versionNameSuffix "-liquid-preview"
             // Keep debug builds fast and fully reflective.
             minifyEnabled false
         }

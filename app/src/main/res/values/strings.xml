@@ -445,7 +445,7 @@
     <string name="appearance_dark">Appearance: dark</string>
     <string name="patch_card_step">Step 1 · Root</string>
     <string name="patch_card_title">5G regional modem patch</string>
-    <string name="patch_card_pitch">Lets the Tensor modem accept 5G (EN-DC) on carriers its firmware does not list. Do this first, then reboot.</string>
+    <string name="patch_card_pitch">An experimental Tensor modem compatibility patch for carrier mappings. Installing it requires a reboot. A mounted patch does not guarantee a 5G connection.</string>
     <string name="patch_card_checking">Checking the modem patch…</string>
     <string name="patch_card_active">Patch active</string>
     <string name="patch_card_inactive">Patch inactive</string>

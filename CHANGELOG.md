@@ -1,5 +1,16 @@
 # Changelog
 
+### 2.2.7 Liquid - redesigned app and detailed live monitor
+
+- Liquid Glass redesign of Home and Network, in light and dark, with plain-language explanations.
+- Network shows every current LTE CA carrier with its band, channel, PCI, bandwidth and signal readings; totals follow each sample and Android's retained summary is labelled separately.
+- Separates the LTE anchor, active 5G carrier and nearby cells; reports "5G advertised · LTE only" when the modem says EN-DC is unavailable. Never borrows another SIM's readings.
+- Fixes raw service-state text and numeric carrier titles such as `413-02`.
+- Home holds setup, access, enabled settings and modem compatibility; live readings moved to Network.
+- Adds Pixel 8a, Pixel 9a, Pixel 10 and Pixel 10a to the modem-patch device list. Field-test reports include the hardware SKU.
+- Known limitation: some Pixel 10 Pro XL users still stay on LTE where other phones get n78; not fixed in this release.
+- See the [release notes](.github/release-notes/v2.2.7.md).
+
 ### 2.2.6 - combined root compatibility and field-test fixes
 
 - Combines the working 2.2.5 root build with all diagnostic fixes from the public 2.2.1 release; version code 38 upgrades both build lines.

@@ -18,10 +18,7 @@ import dev.bluehouse.enablevolte.R
  * columns while it updates. Everything a person reads as prose stays on the
  * system face, which is the one tuned for the device it is being read on.
  */
-val Display = FontFamily(
-    Font(R.font.chakra_petch_semibold, FontWeight.SemiBold),
-    Font(R.font.chakra_petch_medium, FontWeight.Medium),
-)
+val Display = FontFamily.SansSerif
 
 val Mono = FontFamily(
     Font(R.font.jetbrains_mono_medium, FontWeight.Medium),
@@ -43,7 +40,7 @@ val Typography =
         labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp),
         // Field labels above readings: small, wide-tracked, always upper-cased.
         labelMedium = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 10.sp, lineHeight = 13.sp, letterSpacing = 1.6.sp),
-        labelSmall = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 9.sp, lineHeight = 12.sp, letterSpacing = 1.2.sp),
+        labelSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 15.sp, letterSpacing = 0.sp),
     )
 
 /** The headline reading on a screen — the one number you look at first. */

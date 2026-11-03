@@ -579,6 +579,8 @@ class SubscriptionModer(
         val registrationSummary: String,
         val serviceStateSummary: String,
         val cells: List<CellSnapshot>,
+        val cellBandwidthsKhz: List<Int> = emptyList(),
+        val cellsScopedToSubscription: Boolean = false,
     )
 
     data class CellSnapshot(
@@ -675,7 +677,10 @@ class SubscriptionModer(
                         cqi = signal.cqi.validSignalValue(),
                         timingAdvance = signal.timingAdvance.validSignalValue(),
                         bandwidthKhz = identity.bandwidth.takeIf { it > 0 && it != Int.MAX_VALUE },
-                        frequencyKhz = null,
+                        frequencyKhz = runCatching {
+                            AccessNetworkUtils.getFrequencyFromEarfcn(band, identity.earfcn, false)
+                                .takeIf { it > 0 && it != Int.MAX_VALUE }?.toLong()
+                        }.getOrNull(),
                         allBands = identity.bands.joinToString(prefix = "[", postfix = "]") { "B$it" },
                         csiRsrp = null,
                         csiRsrq = null,
@@ -813,6 +818,8 @@ class SubscriptionModer(
             registrationSummary = registration?.toString().orEmpty(),
             serviceStateSummary = state?.toString().orEmpty(),
             cells = cellSnapshots,
+            cellsScopedToSubscription = refreshedCells != null && cells === refreshedCells,
+            cellBandwidthsKhz = runCatching { state?.cellBandwidths?.filter { it > 0 && it != Int.MAX_VALUE }.orEmpty() }.getOrDefault(emptyList()),
         )
     }
 

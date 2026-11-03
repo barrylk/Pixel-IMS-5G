@@ -49,6 +49,8 @@ data class SetupState(
     val checks: List<ReadinessCheck> = emptyList(),
     val carrier: String = "",
     val note: String? = null,
+    val checkedAt: Long = 0,
+    val refreshing: Boolean = false,
 ) {
     val blocking = checks.filter { it.blocking }
     val passed = blocking.count { it.status == CheckStatus.PASS }
@@ -60,11 +62,11 @@ data class SetupState(
 }
 
 /**
- * Works out why 5G is not connecting on this SIM.
+ * Reads setup settings and observed connection state for this SIM.
  *
- * The checks run in dependency order — there is no point reporting that the
- * modem refused EN-DC if VoLTE was never switched on — and each one that fails
- * carries the specific action that addresses it.
+ * Settings and connection evidence are separate: a missing NR link does not
+ * establish that the modem or network rejected it. Fix actions address only
+ * the setting each check actually observed.
  */
 class SetupViewModel(
     application: Application,
@@ -86,9 +88,10 @@ class SetupViewModel(
         // A newer refresh supersedes an older one rather than racing it to the state.
         checkJob?.cancel()
         checkJob = viewModelScope.launch {
-            _state.value = _state.value.copy(loading = _state.value.checks.isEmpty())
+            _state.value = _state.value.copy(loading = _state.value.checks.isEmpty(), refreshing = true)
             val result = withContext(Dispatchers.IO) { runChecks() }
-            _state.value = _state.value.copy(loading = false, checks = result.first, carrier = result.second, busyFix = null)
+            _state.value = _state.value.copy(loading = false, checks = result.first, carrier = result.second,
+                checkedAt = System.currentTimeMillis(), busyFix = null, refreshing = false)
         }
     }
 
@@ -177,7 +180,7 @@ class SetupViewModel(
         out += ReadinessCheck(
             id = "volte",
             title = "VoLTE enabled",
-            detail = if (volte) "Carrier config allows VoLTE" else "5G attaches over an LTE anchor, so VoLTE has to be on first",
+            detail = if (volte) "Carrier configuration allows LTE calling. IMS registration is checked separately." else "Carrier configuration disables LTE calling.",
             status = if (volte) CheckStatus.PASS else CheckStatus.FAIL,
             fix = if (volte) FixAction.NONE else FixAction.ENABLE_VOLTE,
             fixLabel = if (volte) null else "Enable VoLTE",
@@ -192,7 +195,7 @@ class SetupViewModel(
         }
         out += ReadinessCheck(
             id = "nr_mode",
-            title = "NR architecture",
+            title = "5G mode",
             detail = if (nrIndex == 0) "NR is switched off in carrier config" else "Set to $nrLabel",
             status = if (nrIndex == 0) CheckStatus.FAIL else CheckStatus.PASS,
             fix = if (nrIndex == 0) FixAction.SET_NR_ARCHITECTURE else FixAction.NONE,
@@ -222,8 +225,8 @@ class SetupViewModel(
             val vonr = runCatching { moder.isVoNrConfigEnabled }.getOrDefault(false)
             out += ReadinessCheck(
                 id = "vonr",
-                title = "VoNR",
-                detail = if (vonr) "Voice over 5G is on" else "Optional — only matters for voice on standalone 5G",
+                title = "VoNR setting",
+                detail = if (vonr) "Carrier configuration allows voice over 5G; registration is checked separately." else "Optional — only matters for voice on standalone 5G",
                 status = if (vonr) CheckStatus.PASS else CheckStatus.WARN,
                 fix = if (vonr) FixAction.NONE else FixAction.ENABLE_VONR,
                 fixLabel = if (vonr) null else "Enable VoNR",
@@ -245,7 +248,7 @@ class SetupViewModel(
                     patch.installed -> patch.message.ifBlank { "Installed but inactive" }
                     !patch.magiskAvailable -> "No Magisk, KernelSU or APatch was found, so the systemless patch cannot be installed"
                     !patch.sourceAvailable -> "This firmware's modem database could not be read, so there is nothing to patch"
-                    else -> "Not installed. This is the step that makes the modem accept EN-DC"
+                    else -> "Not installed. This optional compatibility patch changes the modem carrier mapping; it does not guarantee 5G attachment."
                 },
                 status = ReadinessRules.patchStatus(patch),
                 fix = if (patch != null && ReadinessRules.canInstallPatch(patch)) FixAction.INSTALL_MODEM_PATCH else FixAction.NONE,
@@ -255,62 +258,13 @@ class SetupViewModel(
             out += ReadinessCheck(
                 id = "patch",
                 title = "Modem region patch",
-                detail = "Root only. Shizuku cannot reach the modem configuration, so 5G itself needs root.",
+                detail = "Installing this compatibility patch requires root. Shizuku can read and adjust supported Android settings.",
                 status = CheckStatus.WARN,
                 blocking = false,
             )
         }
 
-        // The outcome, not a setting: is there actually an NR leg up right now.
-        val radio = runCatching { moder.getRadioDiagnostics() }.getOrNull()
-        val nrCell = radio?.cells?.firstOrNull { it.registered && it.type.contains("NR", ignoreCase = true) }
-        val connected = radio != null && ReadinessRules.is5gConnected(radio.dataRat, radio.nrState, nrCell != null)
-        out += ReadinessCheck(
-            id = "endc",
-            title = "5G connected",
-            detail = when {
-                radio == null -> "Could not read the radio"
-                nrCell != null -> "Attached on ${nrCell.band} · ${nrCell.channel} · ${nrCell.rsrp ?: nrCell.dbm} dBm"
-                connected && radio?.dataRat == "NR" -> "Connected on 5G SA"
-                connected -> "Connected on 5G NSA (the NR leg rides an LTE anchor)"
-                else -> "No NR cell registered. If everything above passes, the modem is refusing EN-DC."
-            },
-            status = when {
-                radio == null -> CheckStatus.UNKNOWN
-                connected -> CheckStatus.PASS
-                else -> CheckStatus.FAIL
-            },
-        )
-
-        val ims = runCatching { moder.diagnoseIms() }.getOrNull()
-        out += ReadinessCheck(
-            id = "ims_reg",
-            title = "IMS registered",
-            detail = when {
-                ims == null -> "Status unavailable"
-                ims.registered -> "Calls will use VoLTE"
-                else -> imsIssueText(ims.issue)
-            },
-            status = when {
-                ims == null -> CheckStatus.UNKNOWN
-                ims.registered -> CheckStatus.PASS
-                else -> CheckStatus.WARN
-            },
-            fix = if (ims?.registered == false) FixAction.RESTART_IMS else FixAction.NONE,
-            fixLabel = if (ims?.registered == false) "Restart IMS" else null,
-            blocking = false,
-        )
-
         return out to carrier
-    }
-
-    private fun imsIssueText(issue: SubscriptionModer.ImsIssue): String = when (issue) {
-        SubscriptionModer.ImsIssue.NO_CELLULAR_SERVICE -> "No cellular service to register against"
-        SubscriptionModer.ImsIssue.VOLTE_DISABLED_BY_CONFIG -> "VoLTE is disabled in carrier config"
-        SubscriptionModer.ImsIssue.LTE_NR_NOT_ALLOWED -> "The radio is not allowed on LTE or NR"
-        SubscriptionModer.ImsIssue.CARRIER_PROVISIONING_OR_NETWORK -> "The carrier has not provisioned this line, or the network refused"
-        SubscriptionModer.ImsIssue.STATUS_UNAVAILABLE -> "The platform did not report a status"
-        SubscriptionModer.ImsIssue.REGISTERED -> "Registered"
     }
 
     companion object {
