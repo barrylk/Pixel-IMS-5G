@@ -2,6 +2,7 @@ package dev.bluehouse.enablevolte.pages
 
 import android.content.Intent
 import android.telephony.SubscriptionInfo
+import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -20,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,9 +32,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.FieldTestReporter
 import dev.bluehouse.enablevolte.FieldTestResult
@@ -40,6 +45,8 @@ import dev.bluehouse.enablevolte.MobileRadioIsolationSession
 import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.PrivilegeMode
 import dev.bluehouse.enablevolte.R
+import dev.bluehouse.enablevolte.RadioLogCaptureResult
+import dev.bluehouse.enablevolte.RadioLogExport
 import dev.bluehouse.enablevolte.SubscriptionModer
 import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PremiumPageIntro
@@ -334,6 +341,8 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
             }
         }
 
+        RadioLogCapturePanel()
+
         if (status != null || error != null) {
             Panel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -363,6 +372,157 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
                         Icon(Icons.Filled.Share, contentDescription = null)
                         Text(stringResource(R.string.share_field_test))
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Root-only capture of the vendor RIL and modem logs that explain an EN-DC decision.
+ *
+ * Read-only: it never enables logging or changes radio settings. The archive is saved to
+ * Downloads next to Field Test reports and can be shared from here.
+ */
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun RadioLogCapturePanel() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val rootReady = PrivilegeManager.activeMode == PrivilegeMode.ROOT && PrivilegeManager.isRootReady()
+    var redact by rememberSaveable { mutableStateOf(true) }
+    // Not saveable, like the field test: the capture coroutine does not survive recreation.
+    var busy by remember { mutableStateOf(false) }
+    var capture by remember { mutableStateOf<RadioLogCaptureResult?>(null) }
+    var captureError by remember { mutableStateOf<String?>(null) }
+
+    Panel(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(Icons.Filled.Description, null, tint = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.radio_logs_title), style = MaterialTheme.typography.titleLarge)
+                }
+                PremiumStatusChip(stringResource(R.string.radio_logs_root_chip), StatusTone.ACCENT)
+            }
+            Text(
+                stringResource(R.string.radio_logs_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.radio_logs_redact), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.radio_logs_redact_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = redact, enabled = !busy, onCheckedChange = { redact = it })
+            }
+            if (!redact) {
+                Text(
+                    stringResource(R.string.radio_logs_unredacted_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            Button(
+                enabled = rootReady && !busy,
+                onClick = {
+                    busy = true
+                    captureError = null
+                    capture = null
+                    scope.launch {
+                        try {
+                            capture = RadioLogExport.capture(context, redact)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Throwable) {
+                            captureError = failure.message ?: failure.javaClass.simpleName
+                        } finally {
+                            busy = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(if (busy) R.string.radio_logs_capturing else R.string.radio_logs_capture))
+            }
+            if (!rootReady) {
+                Text(
+                    stringResource(R.string.radio_logs_root_only),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            captureError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            capture?.let { result ->
+                PremiumStatusChip(stringResource(R.string.field_test_complete), StatusTone.SUCCESS)
+                Text(
+                    stringResource(
+                        R.string.radio_logs_saved,
+                        result.fileName,
+                        result.fileCount,
+                        Formatter.formatShortFileSize(context, result.bytes),
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (result.rilFiles == 0) {
+                    Text(
+                        stringResource(R.string.radio_logs_no_ril, result.rilDirectory),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Text(stringResource(R.string.radio_logs_endc_events), style = MaterialTheme.typography.titleSmall)
+                if (result.endcEvents.isEmpty()) {
+                    Text(
+                        stringResource(R.string.radio_logs_endc_none),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    result.endcEvents.takeLast(6).forEach {
+                        Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                    }
+                }
+                if (result.uecap.isNotEmpty()) {
+                    Text(stringResource(R.string.radio_logs_uecap), style = MaterialTheme.typography.titleSmall)
+                    result.uecap.takeLast(4).forEach {
+                        Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                    }
+                }
+                if (result.skipped > 0) {
+                    Text(
+                        stringResource(R.string.radio_logs_skipped, result.skipped),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/zip"
+                            putExtra(Intent.EXTRA_STREAM, result.uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.radio_logs_share)))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.Share, contentDescription = null)
+                    Text(stringResource(R.string.radio_logs_share))
                 }
             }
         }
