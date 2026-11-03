@@ -1,5 +1,13 @@
 # Changelog
 
+### 2.2.8 - radio log capture
+
+- New root-only **Radio log capture** in Field Test: saves the vendor RIL logs (sit-ril), the modem's UE-capability logs, extended radio logs, the radio log buffer and telephony state to a ZIP in Downloads, with a Share button. Read-only; nothing is enabled or changed.
+- Shows the modem's EN-DC capability events with cause codes and decodes each capability log into the LTE + 5G combinations the phone offered the network.
+- Identifiers (IMSI, ICCID, IMEI, phone numbers, IP addresses) are redacted by default; binary RIL files that cannot be redacted are skipped while redaction is on.
+- The Pixel 10 Pro XL 5G issue remains open; this release adds the tool to diagnose it.
+- See the [release notes](.github/release-notes/v2.2.8.md).
+
 ### 2.2.7 Liquid - redesigned app and detailed live monitor
 
 - Liquid Glass redesign of Home and Network, in light and dark, with plain-language explanations.

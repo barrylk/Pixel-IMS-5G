@@ -1,6 +1,7 @@
 package dev.bluehouse.enablevolte;
 
 import android.os.IBinder;
+import android.os.ParcelFileDescriptor;
 
 interface IPrivilegedService {
     IBinder getSystemService(String name);
@@ -17,4 +18,5 @@ interface IPrivilegedService {
     String applyRootVoWifiRepair(int subscriptionId);
     String restoreRootVoWifiRepair(int subscriptionId);
     boolean setImsStatusBarMonitoring(boolean enabled, in int[] subscriptionIds);
+    String captureRadioLogs(in ParcelFileDescriptor output, boolean redact);
 }

@@ -9,6 +9,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.Parcel
+import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.os.ServiceManager
 import android.telephony.ims.ImsMmTelManager
@@ -17,8 +18,16 @@ import com.android.internal.statusbar.IStatusBarService
 import com.android.internal.telephony.ITelephony
 import com.topjohnwu.superuser.ipc.RootService
 import org.lsposed.hiddenapibypass.HiddenApiBypass
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.RandomAccessFile
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -225,6 +234,17 @@ class PrivilegedService : RootService() {
             }.onFailure {
                 Log.e(TAG, "Unable to configure IMS status-bar monitor", it)
             }.getOrDefault(false)
+
+        override fun captureRadioLogs(output: ParcelFileDescriptor, redact: Boolean): String =
+            runCatching { writeRadioLogArchive(output, redact) }
+                .getOrElse {
+                    Log.e(TAG, "Radio log capture failed", it)
+                    runCatching { output.close() }
+                    JSONObject()
+                        .put("ok", false)
+                        .put("message", it.message ?: "Radio log capture failed.")
+                        .toString()
+                }
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -528,6 +548,166 @@ class PrivilegedService : RootService() {
                 HiddenApiBypass.invoke(Class.forName(walFlags), null, "init", null)
             }.onFailure { Log.w(TAG, "Unable to pre-initialise SQLite compatibility flags", it) }
         }
+
+        /**
+         * Read-only capture of the radio evidence that explains an EN-DC decision: the
+         * vendor RIL logs (which record `ENDCCapaInd` cause codes), the modem's UE-capability
+         * logs, extended radio logs, the radio log buffer and the telephony registry.
+         *
+         * Only fixed directories under /data/vendor/radio are read, symlinks are skipped and
+         * sizes are capped. Nothing is enabled or changed: if RIL logging is off, the summary
+         * says so. With [redact], text is passed through [RadioLogDigest.redact] and binary
+         * RIL files, which cannot be redacted, are listed as skipped instead of copied.
+         */
+        private fun writeRadioLogArchive(output: ParcelFileDescriptor, redact: Boolean): String {
+            val files = JSONArray()
+            val skipped = JSONArray()
+            val endcEvents = mutableListOf<String>()
+            val uecap = JSONArray()
+            var total = 0L
+            val rilDir = radioLogDirectory()
+            var rilFileCount = 0
+            val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+
+            ZipOutputStream(BufferedOutputStream(ParcelFileDescriptor.AutoCloseOutputStream(output))).use { zip ->
+                fun put(name: String, bytes: ByteArray, redacted: Boolean) {
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write(bytes)
+                    zip.closeEntry()
+                    total += bytes.size
+                    files.put(JSONObject().put("name", name).put("bytes", bytes.size).put("redacted", redacted))
+                }
+                fun putText(name: String, text: String) =
+                    put(name, (if (redact) RadioLogDigest.redact(text) else text).toByteArray(), redact)
+                fun skip(name: String, reason: String) {
+                    skipped.put(JSONObject().put("name", name).put("reason", reason))
+                }
+
+                // Vendor RIL logs.
+                for (file in radioFiles(rilDir)) {
+                    val name = "sit-ril/${file.relativeTo(rilDir).path}"
+                    if (total >= RADIO_LOG_TOTAL_LIMIT) {
+                        skip(name, "size limit reached")
+                        continue
+                    }
+                    val bytes = readTail(file, RADIO_LOG_FILE_LIMIT)
+                    rilFileCount++
+                    if (RadioLogDigest.isProbablyText(bytes.copyOf(minOf(bytes.size, 4096)))) {
+                        val text = String(bytes, Charsets.UTF_8)
+                        endcEvents += RadioLogDigest.endcEvents(text)
+                        putText(name, text)
+                    } else if (redact) {
+                        skip(name, "binary log; cannot be redacted")
+                    } else {
+                        put(name, bytes, false)
+                    }
+                }
+
+                // Modem UE-capability logs: band combinations only, no subscriber identifiers.
+                radioFiles(File(UECAP_LOG_DIR), maxDepth = 1)
+                    .filter { it.name.startsWith("uecap_log_file") }
+                    .sortedBy { it.lastModified() }
+                    .forEach { file ->
+                        val bytes = readTail(file, RADIO_LOG_FILE_LIMIT)
+                        put("modem-uecap/${file.name}", bytes, false)
+                        val described = RadioLogDigest.decodeUecapLog(bytes)?.describe() ?: "unreadable"
+                        uecap.put("${stamp.format(Date(file.lastModified()))}  ${file.name}: $described")
+                    }
+
+                // Extended radio logs (text).
+                radioFiles(File(EXTENDED_LOG_DIR), maxDepth = 1).forEach { file ->
+                    val bytes = readTail(file, RADIO_LOG_FILE_LIMIT)
+                    if (RadioLogDigest.isProbablyText(bytes.copyOf(minOf(bytes.size, 4096)))) {
+                        putText("extended_logs/${file.name}", String(bytes, Charsets.UTF_8))
+                    }
+                }
+
+                // Android-side radio state at the time of capture.
+                val radioBuffer = runCommand("/system/bin/logcat", "-b", "radio", "-d", "-v", "threadtime").output
+                endcEvents += RadioLogDigest.endcEvents(radioBuffer)
+                putText("logcat-radio.txt", radioBuffer)
+                putText("telephony-registry.txt", runCommand("/system/bin/dumpsys", "telephony.registry").output)
+                put("radio-properties.txt", extractRadioProperties(runCommand("/system/bin/getprop").output).toByteArray(), true)
+
+                val events = endcEvents.distinct().takeLast(40).map { if (redact) RadioLogDigest.redact(it) else it }
+                val summary = buildString {
+                    appendLine("Pixel IMS 5G radio log capture")
+                    appendLine("Captured: ${stamp.format(Date())}")
+                    appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE}), Android ${Build.VERSION.RELEASE}")
+                    appendLine("Baseband: ${runCommand("/system/bin/getprop", "gsm.version.baseband").output.trim()}")
+                    appendLine("Redacted: $redact")
+                    appendLine()
+                    appendLine("Vendor RIL log directory: ${rilDir.path}")
+                    appendLine(
+                        if (rilFileCount == 0) {
+                            "  No RIL log files found. RIL logging may be disabled on this build; nothing was changed."
+                        } else {
+                            "  $rilFileCount file(s) read."
+                        },
+                    )
+                    appendLine()
+                    appendLine("EN-DC capability events (newest last):")
+                    if (events.isEmpty()) appendLine("  none found") else events.forEach { appendLine("  $it") }
+                    appendLine()
+                    appendLine("Modem UE-capability logs (oldest first):")
+                    if (uecap.length() == 0) appendLine("  none found")
+                    for (i in 0 until uecap.length()) appendLine("  ${uecap.getString(i)}")
+                    if (skipped.length() > 0) {
+                        appendLine()
+                        appendLine("Skipped:")
+                        for (i in 0 until skipped.length()) {
+                            val s = skipped.getJSONObject(i)
+                            appendLine("  ${s.getString("name")}: ${s.getString("reason")}")
+                        }
+                    }
+                }
+                put("00-summary.txt", summary.toByteArray(), redact)
+
+                return JSONObject()
+                    .put("ok", true)
+                    .put("message", "Captured ${files.length()} file(s).")
+                    .put("bytes", total)
+                    .put("rilFiles", rilFileCount)
+                    .put("rilDirectory", rilDir.path)
+                    .put("files", files)
+                    .put("skipped", skipped)
+                    .put("endcEvents", JSONArray(events))
+                    .put("uecap", uecap)
+                    .toString()
+            }
+        }
+
+        /** The RIL's configured log directory, accepted only inside /data/vendor/radio. */
+        private fun radioLogDirectory(): File {
+            val configured = runCommand("/system/bin/getprop", "persist.vendor.ril.log.base_dir").output.trim()
+            val candidate = File(configured.ifBlank { DEFAULT_RIL_LOG_DIR })
+            val canonical = runCatching { candidate.canonicalPath }.getOrNull()
+            return if (canonical != null && canonical.startsWith("$RADIO_DATA_ROOT/")) File(canonical) else File(DEFAULT_RIL_LOG_DIR)
+        }
+
+        /** Regular files under [root], newest first, never following symlinks out of it. */
+        private fun radioFiles(root: File, maxDepth: Int = 3): List<File> {
+            val base = runCatching { root.canonicalFile }.getOrNull() ?: return emptyList()
+            if (!base.isDirectory || !base.path.startsWith("$RADIO_DATA_ROOT/")) return emptyList()
+            return base.walkTopDown()
+                .maxDepth(maxDepth)
+                .filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
+                .filter { runCatching { it.canonicalPath.startsWith(base.path + "/") }.getOrDefault(false) }
+                .sortedByDescending { it.lastModified() }
+                .take(RADIO_LOG_FILE_COUNT_LIMIT)
+                .toList()
+        }
+
+        /** The newest [limit] bytes of [file]: logs append, so the tail is the recent part. */
+        private fun readTail(file: File, limit: Int): ByteArray =
+            RandomAccessFile(file, "r").use { raf ->
+                val length = raf.length()
+                val start = (length - limit).coerceAtLeast(0)
+                val bytes = ByteArray((length - start).toInt())
+                raf.seek(start)
+                raf.readFully(bytes)
+                bytes
+            }
 
         private fun runCommand(vararg command: String): CommandResult =
             runCatching {
@@ -909,6 +1089,13 @@ class PrivilegedService : RootService() {
             "/data/adb/magisk/magiskpolicy",
             "/data/adb/ap/bin/magiskpolicy",
         )
+        private const val RADIO_DATA_ROOT = "/data/vendor/radio"
+        private const val DEFAULT_RIL_LOG_DIR = "$RADIO_DATA_ROOT/sit-ril"
+        private const val UECAP_LOG_DIR = "$RADIO_DATA_ROOT/modem_temp_file"
+        private const val EXTENDED_LOG_DIR = "$RADIO_DATA_ROOT/extended_logs"
+        private const val RADIO_LOG_FILE_LIMIT = 16 * 1024 * 1024
+        private const val RADIO_LOG_TOTAL_LIMIT = 64L * 1024 * 1024
+        private const val RADIO_LOG_FILE_COUNT_LIMIT = 40
         private const val KSUD = "/data/adb/ksud"
         private const val APD = "/data/adb/apd"
         private val TENSOR_DEVICES = setOf(

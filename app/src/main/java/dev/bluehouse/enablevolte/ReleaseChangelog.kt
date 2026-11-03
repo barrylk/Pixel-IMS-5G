@@ -21,6 +21,32 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.2.8" ->
+                InstalledChangelog(
+                    version = "2.2.8",
+                    items = listOf(
+                        ChangelogItem(
+                            title = "Radio log capture in Field Test",
+                            detail = "A new root-only option saves the vendor RIL logs (sit-ril), the modem's capability logs, the radio log buffer and telephony state to a ZIP in Downloads, with a Share button. It is read-only and never changes a setting.",
+                            tone = ChangelogTone.FEATURE,
+                        ),
+                        ChangelogItem(
+                            title = "See why 5G was not added",
+                            detail = "The capture shows the modem's EN-DC capability events with their cause codes and decodes each capability log into the LTE and 5G band combinations the phone offered the network.",
+                            tone = ChangelogTone.FEATURE,
+                        ),
+                        ChangelogItem(
+                            title = "Identifiers redacted by default",
+                            detail = "IMSI, ICCID, IMEI, phone numbers and IP addresses are masked before anything leaves the app. Binary RIL files that cannot be redacted are skipped while redaction is on.",
+                            tone = ChangelogTone.IMPROVEMENT,
+                        ),
+                        ChangelogItem(
+                            title = "Pixel 10 Pro XL 5G is still under investigation",
+                            detail = "This release adds the tool to diagnose it; it does not fix the Pixel 10 Pro XL staying on LTE where other phones get 5G.",
+                            tone = ChangelogTone.IMPORTANT,
+                        ),
+                    ),
+                )
             "2.2.7" ->
                 InstalledChangelog(
                     version = "2.2.7",

@@ -90,6 +90,20 @@ object PrivilegeManager {
     fun scheduleRegionalModemPatchRemoval(): RegionalModemPatchStatus =
         rootRegionalPatchCall { it.scheduleRegionalModemPatchRemoval() }
 
+    /**
+     * Writes a ZIP of radio logs into [output] from the root service. Root only: the vendor
+     * RIL and modem log directories are not readable through Shizuku.
+     */
+    fun captureRadioLogs(output: android.os.ParcelFileDescriptor, redact: Boolean): String {
+        if (activeMode != PrivilegeMode.ROOT || !isRootReady()) {
+            return org.json.JSONObject()
+                .put("ok", false)
+                .put("message", "Root access is required to read the RIL and modem logs.")
+                .toString()
+        }
+        return requireNotNull(rootBridge) { "Root service is not connected" }.captureRadioLogs(output, redact)
+    }
+
     fun getRootVoWifiStatus(subscriptionId: Int): RootVoWifiStatus =
         rootVoWifiCall(subscriptionId) { it.getRootVoWifiStatus(subscriptionId) }
 
