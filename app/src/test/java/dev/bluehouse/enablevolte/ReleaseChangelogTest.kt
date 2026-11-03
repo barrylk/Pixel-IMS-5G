@@ -7,6 +7,15 @@ import org.junit.Test
 
 class ReleaseChangelogTest {
     @Test
+    fun liquidReleaseHasBundledChangelogAndStatesThePixel10Limit() {
+        val changelog = ReleaseChangelogCatalog.forVersion("v2.2.7")
+
+        assertEquals("2.2.7", changelog?.version)
+        assertTrue(changelog.orEmptyItems().any { it.title.contains("Liquid") })
+        assertTrue(changelog.orEmptyItems().any { it.tone == ChangelogTone.IMPORTANT && it.title.contains("Pixel 10 Pro XL") })
+    }
+
+    @Test
     fun combinedReleaseIncludesRootAndDiagnosticFixes() {
         val changelog = ReleaseChangelogCatalog.forVersion("v2.2.6")
 

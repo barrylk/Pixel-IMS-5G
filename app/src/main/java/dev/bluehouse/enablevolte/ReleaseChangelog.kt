@@ -21,6 +21,47 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.2.7" ->
+                InstalledChangelog(
+                    version = "2.2.7",
+                    items = listOf(
+                        ChangelogItem(
+                            title = "Liquid Glass redesign",
+                            detail = "A completely new Home and Network design with translucent glass panels, clear typography and plain-language explanations, in light and dark.",
+                            tone = ChangelogTone.FEATURE,
+                        ),
+                        ChangelogItem(
+                            title = "Live carrier aggregation, in plain sight",
+                            detail = "Network shows every current LTE CA carrier with its own band, channel, PCI, bandwidth and signal readings. Totals follow the carriers reported in each sample, so 3 to 2 to 1 carriers update immediately; Android's retained summary is labelled separately.",
+                            tone = ChangelogTone.FEATURE,
+                        ),
+                        ChangelogItem(
+                            title = "5G anchor and NR status that tells the truth",
+                            detail = "Separates the LTE anchor, an active 5G carrier and nearby cells. When the network advertises 5G but the modem reports EN-DC unavailable, the monitor says 5G advertised, LTE only, instead of implying a 5G connection.",
+                            tone = ChangelogTone.IMPROVEMENT,
+                        ),
+                        ChangelogItem(
+                            title = "Clean carrier names",
+                            detail = "Fixes the raw Android service-state text and the numeric 413-02 title; carriers show as Dialog, SLT-MOBITEL and so on.",
+                            tone = ChangelogTone.FIX,
+                        ),
+                        ChangelogItem(
+                            title = "Home focused on setup",
+                            detail = "Home now holds access, enabled settings and modem compatibility. Live connection, signal and CA readings live on Network.",
+                            tone = ChangelogTone.IMPROVEMENT,
+                        ),
+                        ChangelogItem(
+                            title = "More Tensor Pixels for the modem patch",
+                            detail = "Adds Pixel 8a, Pixel 9a, Pixel 10 and Pixel 10a to the validated device list. The installer still validates each phone's own modem database first.",
+                            tone = ChangelogTone.FIX,
+                        ),
+                        ChangelogItem(
+                            title = "Pixel 10 Pro XL 5G is still under investigation",
+                            detail = "The modem patch is active and the phone advertises n78 capability, but some Pixel 10 Pro XL users still stay on LTE where other phones get 5G. This release does not fix that yet.",
+                            tone = ChangelogTone.IMPORTANT,
+                        ),
+                    ),
+                )
             "2.2.6" ->
                 InstalledChangelog(
                     version = "2.2.6",

@@ -18,6 +18,8 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 
@@ -62,6 +64,18 @@ fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
                 )
                 onDrawBehind {
                     pools.forEach { drawRect(it) }
+                    // Broad, quiet folds provide changing light behind translucent controls.
+                    // These are drawn once per size/theme, not animated every radio sample.
+                    val fold = Path().apply {
+                        moveTo(-w * .4f, h * .05f)
+                        cubicTo(w * .85f, h * .02f, -w * .1f, h * .48f, w * 1.2f, h * .62f)
+                    }
+                    drawPath(fold, Brush.linearGradient(listOf(Color.Transparent,
+                        inst.glow.copy(alpha = if (inst.isDark) .06f else .12f), Color.Transparent)),
+                        style = Stroke(width = w * .4f))
+                    drawPath(fold, Brush.linearGradient(listOf(Color.Transparent,
+                        Color.White.copy(alpha = if (inst.isDark) .045f else .30f), Color.Transparent)),
+                        style = Stroke(width = 1.5.dp.toPx()))
                     drawRect(vignette)
                 }
             },

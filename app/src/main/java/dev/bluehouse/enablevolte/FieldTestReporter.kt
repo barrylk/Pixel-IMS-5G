@@ -345,6 +345,7 @@ object FieldTestReporter {
             appendLine("Build fingerprint: ${Build.FINGERPRINT}")
             appendLine("Security patch: ${Build.VERSION.SECURITY_PATCH}")
             appendLine("Baseband: ${Build.getRadioVersion().orEmpty()}")
+            appendLine("Hardware SKU: ${Build.SKU}")
             appendLine("Privilege backend: ${PrivilegeManager.activeMode}")
             appendLine("Test mode: $modeLabel")
             appendLine("Connectivity isolation: $wifiIsolation")

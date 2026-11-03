@@ -38,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.ReadinessRules
 import dev.bluehouse.enablevolte.RegionalModemPatchStatus
@@ -75,6 +77,8 @@ fun RegionalPatchCard(
     viewModel: RegionalPatchViewModel,
     modifier: Modifier = Modifier,
     compactWhenActive: Boolean = true,
+    liquidStyle: Boolean = false,
+    detailsAlwaysVisible: Boolean = false,
 ) {
     val ui by viewModel.state.collectAsState()
     val inst = LocalInstrument.current
@@ -122,8 +126,9 @@ fun RegionalPatchCard(
     }
 
     val prominent = phase == PatchPhase.READY || phase == PatchPhase.REBOOT
-    Panel(
+    PatchCardSurface(
         modifier.fillMaxWidth(),
+        liquidStyle = liquidStyle,
         depth = if (prominent) GlassDepth.TINTED else GlassDepth.REGULAR,
         tint = if (prominent) tone else Color.Unspecified,
     ) {
@@ -137,19 +142,24 @@ fun RegionalPatchCard(
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(
+                    if (!liquidStyle) Text(
                         stringResource(R.string.patch_card_step).uppercase(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = tone,
+                        style = MaterialTheme.typography.labelMedium, color = tone,
                     )
-                    Text(stringResource(R.string.patch_card_title), style = MaterialTheme.typography.titleLarge)
+                    Text(if (liquidStyle) "Modem compatibility" else stringResource(R.string.patch_card_title),
+                        style = MaterialTheme.typography.titleLarge)
+                    if (liquidStyle) Text("Regional carrier profile", fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (phase == PatchPhase.CHECKING || ui.busy) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 }
             }
             if (phase != PatchPhase.CHECKING && !ui.busy) {
-                SignalChip(label = headline, tone = tone, dot = true)
+                if (liquidStyle) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(8.dp).background(tone, CircleShape))
+                    Text(headline, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = tone)
+                } else SignalChip(label = headline, tone = tone, dot = true)
             }
 
             Text(
@@ -178,7 +188,11 @@ fun RegionalPatchCard(
             }
 
             if (status != null && phase != PatchPhase.CHECKING) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (liquidStyle) {
+                    val rootName = status.rootManager.ifBlank { stringResource(R.string.patch_check_magisk) }
+                    Text("${if (status.supported) "✓" else "×"} Tensor  ·  ${if (status.magiskAvailable) "✓" else "×"} $rootName  ·  ${if (status.sourceAvailable) "✓" else "×"} Modem database",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Prerequisite(stringResource(R.string.patch_check_device), status.supported)
                     Prerequisite(status.rootManager.ifBlank { stringResource(R.string.patch_check_magisk) }, status.magiskAvailable)
                     Prerequisite(stringResource(R.string.patch_check_firmware), status.sourceAvailable)
@@ -221,10 +235,12 @@ fun RegionalPatchCard(
                 }
             }
 
-            TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 4.dp)) {
-                Text(stringResource(if (expanded) R.string.patch_card_hide_details else R.string.patch_card_details))
+            if (!detailsAlwaysVisible) {
+                TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                    Text(stringResource(if (expanded) R.string.patch_card_hide_details else R.string.patch_card_details))
+                }
             }
-            AnimatedVisibility(visible = expanded) {
+            AnimatedVisibility(visible = detailsAlwaysVisible || expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.regional_patch_description), style = MaterialTheme.typography.bodySmall)
                     status?.let { patch ->
@@ -248,6 +264,18 @@ fun RegionalPatchCard(
             }
         }
     }
+}
+
+@Composable
+private fun PatchCardSurface(
+    modifier: Modifier,
+    liquidStyle: Boolean,
+    depth: GlassDepth,
+    tint: Color,
+    content: @Composable () -> Unit,
+) {
+    if (liquidStyle) LiquidSurface(modifier, content)
+    else Panel(modifier, depth = depth, tint = tint, content = content)
 }
 
 @Composable

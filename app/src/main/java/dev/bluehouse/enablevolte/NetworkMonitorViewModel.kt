@@ -53,6 +53,9 @@ data class NetworkState(
     val available: Boolean = false,
     val message: String? = null,
     val serviceState: String = "",
+    val radio: SubscriptionModer.RadioDiagnostics? = null,
+    val connection: LiveConnection? = null,
+    val physicalChannels: List<LivePhysicalChannel> = emptyList(),
     val serving: SubscriptionModer.CellSnapshot? = null,
     val anchor: SubscriptionModer.CellSnapshot? = null,
     val neighbours: List<SubscriptionModer.CellSnapshot> = emptyList(),
@@ -62,8 +65,7 @@ data class NetworkState(
     val lastSampleAt: Long = 0,
 ) {
     /** Whether the phone currently has an NR leg, on either NSA or SA. */
-    val nrAttached: Boolean get() = serving?.type?.contains("NR", ignoreCase = true) == true ||
-        neighbours.any { it.registered && it.type.contains("NR", ignoreCase = true) }
+    val nrAttached: Boolean get() = connection?.nrConnected == true
 
     val historyMin: Int? get() = rsrpHistory.minOrNull()
     val historyMax: Int? get() = rsrpHistory.maxOrNull()
@@ -117,8 +119,15 @@ class NetworkMonitorViewModel(
     }
 
     private suspend fun sampleOnce() {
-        val diagnostics = withContext(Dispatchers.IO) {
-            runCatching { moder.getRadioDiagnostics() }.getOrNull()
+        val (diagnostics, physical) = withContext(Dispatchers.IO) {
+            val radio = runCatching { moder.getRadioDiagnostics() }.getOrNull()
+            val channels = runCatching {
+                // Use the same privileged subscription bridge as the radio read. The
+                // app itself need not hold READ_PHONE_STATE in root/Shizuku mode.
+                val slot = moder.simSlotIndex
+                parseLivePhysicalChannels(PrivilegeManager.getRootTelephonyDiagnostic("physical-live").orEmpty(), slot)
+            }.onFailure { android.util.Log.w("NetworkMonitor", "Current carrier read failed", it) }.getOrDefault(emptyList())
+            radio to channels
         }
         val previous = _state.value
 
@@ -131,15 +140,12 @@ class NetworkMonitorViewModel(
             return
         }
 
-        val cells = diagnostics.cells
-        // The serving cell is the registered one; prefer NR when the phone has
-        // both legs up, because on NSA the NR leg is the one carrying the data.
-        val registered = cells.filter { it.registered }
-        val serving = registered.firstOrNull { it.type.contains("NR", ignoreCase = true) }
-            ?: registered.firstOrNull()
-            ?: cells.firstOrNull()
-        val anchor = registered.firstOrNull { !it.type.contains("NR", ignoreCase = true) }
-            .takeIf { serving?.type?.contains("NR", ignoreCase = true) == true }
+        val connection = resolveLiveConnection(diagnostics.cells,
+            diagnostics.registeredPlmn?.takeIf { it.isNotBlank() } ?: diagnostics.operatorNumeric,
+            diagnostics.dataRat, diagnostics.nrState, diagnostics.usingCarrierAggregation,
+            diagnostics.nrAvailable, diagnostics.endcAvailable, physical, diagnostics.cellsScopedToSubscription)
+        val serving = connection.serving
+        val anchor = connection.anchor
 
         val rsrp = serving?.rsrp ?: serving?.dbm
         val history = (previous.rsrpHistory + listOfNotNull(rsrp)).takeLast(HISTORY_LENGTH)
@@ -149,10 +155,13 @@ class NetworkMonitorViewModel(
             loading = false,
             available = true,
             message = null,
-            serviceState = diagnostics.serviceStateSummary,
+            serviceState = diagnostics.serviceState,
+            radio = diagnostics,
+            connection = connection,
+            physicalChannels = physical,
             serving = serving,
             anchor = anchor,
-            neighbours = cells.sortedWith(compareByDescending<SubscriptionModer.CellSnapshot> { it.registered }.thenByDescending { it.dbm }),
+            neighbours = connection.neighbours.sortedByDescending { it.dbm },
             rsrpHistory = history,
             events = events,
             sampleCount = previous.sampleCount + 1,

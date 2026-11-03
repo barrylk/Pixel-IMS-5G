@@ -67,6 +67,7 @@ class PrivilegedService : RootService() {
             if (result.exitCode != 0) return "Diagnostic source failed (${result.exitCode})"
             return runCatching {
                 when (kind) {
+                    "physical-live" -> livePhysicalRegistry(result.output)
                     "physical" -> extractPhysicalChannels(result.output)
                     "properties" -> extractRadioProperties(result.output)
                     "carrier" -> extractCarrierConfig(result.output)
@@ -913,12 +914,13 @@ class PrivilegedService : RootService() {
         private val TENSOR_DEVICES = setOf(
             "oriole", "raven", "bluejay",
             "panther", "cheetah", "lynx", "tangorpro", "felix",
-            "shiba", "husky",
-            "tokay", "caiman", "komodo", "comet",
-            "mustang", "blazer", "rango",
+            "shiba", "husky", "akita",
+            "tokay", "caiman", "komodo", "comet", "tegu",
+            "frankel", "mustang", "blazer", "rango", "stallion",
         )
 
         private val DIAGNOSTIC_COMMANDS = mapOf(
+            "physical-live" to arrayOf("/system/bin/dumpsys", "telephony.registry"),
             "registry" to arrayOf("/system/bin/dumpsys", "telephony.registry"),
             "physical" to arrayOf("/system/bin/dumpsys", "telephony.registry"),
             "phone" to arrayOf("/system/bin/dumpsys", "activity", "service", "com.android.phone"),

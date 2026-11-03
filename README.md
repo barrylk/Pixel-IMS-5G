@@ -2,7 +2,7 @@
 
 IMS controls, radio configuration and live network diagnostics for Google Tensor Pixel phones, with **Root** and **Shizuku** backends.
 
-[**Download 2.2.6**](https://github.com/barrylk/Pixel-IMS-5G/releases/download/v2.2.6/Pixel-IMS-5G-v2.2.6.apk) · [Release notes](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v2.2.6) · [Install and update guide](docs/release-guide.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/barrylk/Pixel-IMS-5G/issues)
+[**Download 2.2.7 Liquid**](https://github.com/barrylk/Pixel-IMS-5G/releases/download/v2.2.7/Pixel-IMS-5G-v2.2.7.apk) · [Release notes](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v2.2.7) · [Install and update guide](docs/release-guide.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/barrylk/Pixel-IMS-5G/issues)
 
 <p align="center">
   <a href="https://github.com/barrylk/Pixel-IMS-5G/blob/main/assets/promo/pixel-ims-5g-promo.mp4">
@@ -12,20 +12,22 @@ IMS controls, radio configuration and live network diagnostics for Google Tensor
   <sub><a href="https://github.com/barrylk/Pixel-IMS-5G/blob/main/assets/promo/pixel-ims-5g-promo.mp4">Watch the promo with sound</a> · <a href="https://github.com/barrylk/Pixel-IMS-5G/blob/main/assets/promo/pixel-ims-5g-promo-vertical.mp4">9:16 vertical</a></sub>
 </p>
 
-## Current release: 2.2.6
+## Current release: 2.2.7 Liquid
 
-**2.2.6 combines the working 2.2.5 root compatibility build with the fixes published separately in 2.2.1.** It uses version code **38** and application ID `com.nirmala.pixel5gims`.
+**2.2.7 Liquid is a complete redesign with a far more detailed live network monitor.** It uses version code **39** and application ID `com.nirmala.pixel5gims`, so it updates existing public installations in place.
 
 | Included changes | What they do |
 | --- | --- |
-| Root compatibility from 2.2.5 | Preserves shell-resolved root startup, queued permission requests and Binder identity handling for the privileged service |
-| KernelSU / KernelSU Next module support | Mounts only `cfg.db` at boot without a mounting metamodule, with hash and SELinux checks, a read-only remount and rollback on failure |
-| Existing Magisk and APatch support | Retains their systemless module installation paths |
-| Patch readiness and revalidation | Distinguishes active, staged, stale and failed patches, including firmware changes |
-| Callback reporting from 2.2.1 | Separates failed registration from successful registration that delivered no callback events |
-| Evidence warnings from 2.2.1 | Separates missing serving cells, conflicting CellInfo and unmatched device-global physical channels |
+| Liquid Glass redesign | New Home and Network screens with translucent glass panels, clear type and plain-language explanations, in light and dark |
+| Live carrier aggregation | Every current LTE CA carrier with its own band, channel, PCI, bandwidth and signal readings, visible without extra panels; totals follow each sample |
+| Honest 5G status | Separates the LTE anchor, active 5G carrier and nearby cells; shows *5G advertised · LTE only* when the modem reports EN-DC unavailable |
+| Clean carrier names | Fixes raw service-state text and numeric titles such as `413-02` |
+| Setup-focused Home | Access, enabled settings and modem compatibility on Home; live readings on Network |
+| More supported Pixels | Adds Pixel 8a, Pixel 9a, Pixel 10 and Pixel 10a to the modem-patch device list |
 
-The optimized release APK is signed with the established public release identity. Both build variants and **53 unit tests** passed. The published APK's version, checksum and signature were verified after download; see the [verification details](docs/release-guide.md#public-apk-verification).
+**Known limitation:** some Pixel 10 Pro XL users still stay on LTE where other phones on the same SIM and tower get n78. The patch is active and the phone advertises n78 capability, but the network does not add the 5G leg. 2.2.7 does not fix this yet.
+
+The optimized release APK is signed with the established public release identity and verified after publication; see the [verification details](docs/release-guide.md#public-apk-verification).
 
 ## Requirements and access
 
@@ -40,13 +42,13 @@ KernelSU users must grant Superuser access to Pixel IMS 5G. This app's single-fi
 
 ## Install or update
 
-1. Download [Pixel-IMS-5G-v2.2.6.apk](https://github.com/barrylk/Pixel-IMS-5G/releases/download/v2.2.6/Pixel-IMS-5G-v2.2.6.apk).
+1. Download [Pixel-IMS-5G-v2.2.7.apk](https://github.com/barrylk/Pixel-IMS-5G/releases/download/v2.2.7/Pixel-IMS-5G-v2.2.7.apk).
 2. Install it over an existing public GitHub release, or install it as a new app.
 3. Open Pixel IMS 5G, choose Root or Shizuku and approve access in that manager.
 4. Select the intended SIM and review Setup. Start with **Automatic** bands and a normal LTE + NR preference.
 5. Use the action offered for a failing Setup check, then inspect the actual network state.
 
-**Locally signed 2.2.5 test builds need a 2.2.6 APK signed with their original local key.** Android will reject the public APK as an in-place update if the installed app uses a different certificate. See the [update guide](docs/release-guide.md#choose-the-correct-apk) before uninstalling anything.
+**Locally signed test builds need an APK signed with their original local key.** Android will reject the public APK as an in-place update if the installed app uses a different certificate. See the [update guide](docs/release-guide.md#choose-the-correct-apk) before uninstalling anything.
 
 ## Regional modem patch
 
