@@ -465,7 +465,7 @@
     <string name="shizuku_reapply_on_boot_summary">Saves SIM Config changes made from now on and reapplies them once Shizuku is running after a reboot. Shizuku has to start on boot (for example a fork that does).</string>
     <string name="radio_logs_title">Radio log capture</string>
     <string name="radio_logs_root_chip">Root</string>
-    <string name="radio_logs_description">Saves the vendor RIL logs (sit-ril), the modem\'s capability logs, the radio log buffer and telephony state to a ZIP in Downloads. Read-only: nothing is enabled or changed. Capture right after reproducing a problem, for example while 5G shows as advertised but not connected.</string>
+    <string name="radio_logs_description">Saves the vendor RIL logs (sit-ril), the modem\'s capability logs, the radio log buffer and telephony state to a ZIP in Downloads. The capture itself is read-only; modem logging below is a separate, opt-in switch. Capture right after reproducing a problem, for example while 5G shows as advertised but not connected.</string>
     <string name="radio_logs_redact">Redact identifiers</string>
     <string name="radio_logs_redact_summary">Masks IMSI, ICCID, IMEI, phone numbers and IP addresses. Binary RIL files cannot be redacted and are skipped while this is on.</string>
     <string name="radio_logs_unredacted_warning">Unredacted logs contain your SIM and phone identifiers and nearby cell locations. Share them only with someone you trust.</string>
@@ -480,4 +480,23 @@
     <string name="radio_logs_uecap">Modem capability logs</string>
     <string name="radio_logs_skipped">%1$d file(s) skipped; see 00-summary.txt in the archive.</string>
     <string name="radio_logs_share">Share log archive</string>
+    <string name="modem_logging_title">Modem diagnostic logging</string>
+    <string name="modem_logging_summary">Turns on the Shannon modem\'s own logger, which records the over-the-air messages (capability exchange, 5G setup and failures) that explain why 5G does not connect. It writes to %1$s until you turn it off.</string>
+    <string name="modem_logging_state">Status: %1$s</string>
+    <string name="modem_logging_files">%1$d log file(s), %2$s on the phone</string>
+    <string name="modem_logging_state_unsupported">not available on this build</string>
+    <string name="modem_logging_state_off">off</string>
+    <string name="modem_logging_state_starting">requested, logger not running yet</string>
+    <string name="modem_logging_state_running">running</string>
+    <string name="modem_logging_state_stopping">stopping</string>
+    <string name="modem_logging_state_unknown">checking…</string>
+    <string name="modem_logging_confirm_title">Turn on modem logging?</string>
+    <string name="modem_logging_confirm_text">This changes a device setting: persist.vendor.sys.modem.logging.enable. While it is on, the modem keeps writing logs to internal storage and uses some extra battery. The logs contain your SIM and phone identifiers and cannot be redacted.\n\nReproduce the 5G problem (airplane mode off and on at the affected tower, then a short speed test), capture with modem logs included, then turn logging off again. The setting survives a reboot until you turn it off.</string>
+    <string name="modem_logging_confirm">Turn on</string>
+    <string name="modem_logging_cancel">Cancel</string>
+    <string name="modem_logging_include">Include modem logs</string>
+    <string name="modem_logging_include_summary">Adds the binary modem logs to the archive, for offline decoding (for example with scat). Large files may take a while.</string>
+    <string name="modem_logging_include_warning">Modem logs are never redacted, even with Redact identifiers on. They contain your IMSI, IMEI and cell details. Share them only with someone you trust.</string>
+    <string name="modem_logging_captured">Modem logs included: %1$d file(s), %2$s (not redacted)</string>
+    <string name="modem_logging_turn_off_reminder">Modem logging is still on. Turn it off when you are done testing.</string>
 </resources>

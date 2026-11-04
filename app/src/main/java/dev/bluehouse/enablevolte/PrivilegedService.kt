@@ -235,8 +235,19 @@ class PrivilegedService : RootService() {
                 Log.e(TAG, "Unable to configure IMS status-bar monitor", it)
             }.getOrDefault(false)
 
-        override fun captureRadioLogs(output: ParcelFileDescriptor, redact: Boolean): String =
-            runCatching { writeRadioLogArchive(output, redact) }
+        override fun getModemLoggingStatus(): String =
+            runCatching { modemLoggingStatus().toString() }
+                .getOrElse { JSONObject().put("ok", false).put("state", "UNSUPPORTED").put("message", it.message).toString() }
+
+        override fun setModemLogging(enable: Boolean): String =
+            runCatching { switchModemLogging(enable).toString() }
+                .getOrElse {
+                    Log.e(TAG, "Modem logging switch failed", it)
+                    JSONObject().put("ok", false).put("state", "UNSUPPORTED").put("message", it.message).toString()
+                }
+
+        override fun captureRadioLogs(output: ParcelFileDescriptor, redact: Boolean, includeModem: Boolean): String =
+            runCatching { writeRadioLogArchive(output, redact, includeModem) }
                 .getOrElse {
                     Log.e(TAG, "Radio log capture failed", it)
                     runCatching { output.close() }
@@ -559,7 +570,10 @@ class PrivilegedService : RootService() {
          * says so. With [redact], text is passed through [RadioLogDigest.redact] and binary
          * RIL files, which cannot be redacted, are listed as skipped instead of copied.
          */
-        private fun writeRadioLogArchive(output: ParcelFileDescriptor, redact: Boolean): String {
+        private fun writeRadioLogArchive(output: ParcelFileDescriptor, redact: Boolean, includeModem: Boolean): String {
+            var modemFileCount = 0
+            var modemBytes = 0L
+            val modemLogging = modemLoggingStatus()
             val files = JSONArray()
             val skipped = JSONArray()
             val endcEvents = mutableListOf<String>()
@@ -636,6 +650,38 @@ class PrivilegedService : RootService() {
                 putText("telephony-registry.txt", runCommand("/system/bin/dumpsys", "telephony.registry").output)
                 put("radio-properties.txt", extractRadioProperties(runCommand("/system/bin/getprop").output).toByteArray(), true)
 
+                // Shannon DM logs, only when asked: binary, unredactable, decoded offline (scat).
+                if (includeModem) {
+                    val modemDir = modemLogDirectory()
+                    radioFiles(modemDir, maxDepth = 3, allowedRoot = VENDOR_DATA_ROOT, limit = MODEM_LOG_FILE_COUNT_LIMIT)
+                        .forEach { file ->
+                            val name = "modem-dm/${file.relativeTo(modemDir).path}"
+                            // The logger may still be appending: copy the length seen now.
+                            val length = file.length()
+                            when {
+                                length > MODEM_LOG_FILE_LIMIT -> skip(name, "modem log larger than 128 MB")
+                                modemBytes + length > MODEM_LOG_TOTAL_LIMIT -> skip(name, "modem log size limit reached")
+                                else -> {
+                                    zip.putNextEntry(ZipEntry(name))
+                                    file.inputStream().use { input ->
+                                        val buffer = ByteArray(64 * 1024)
+                                        var left = length
+                                        while (left > 0) {
+                                            val n = input.read(buffer, 0, minOf(buffer.size.toLong(), left).toInt())
+                                            if (n < 0) break
+                                            zip.write(buffer, 0, n)
+                                            left -= n
+                                        }
+                                    }
+                                    zip.closeEntry()
+                                    modemFileCount++
+                                    modemBytes += length
+                                    files.put(JSONObject().put("name", name).put("bytes", length).put("redacted", false))
+                                }
+                            }
+                        }
+                }
+
                 val events = endcEvents.distinct().takeLast(60).map { if (redact) RadioLogDigest.redact(it) else it }
                 val summary = buildString {
                     appendLine("Pixel IMS 5G radio log capture")
@@ -660,6 +706,16 @@ class PrivilegedService : RootService() {
                         },
                     )
                     appendLine()
+                    appendLine("Modem diagnostic (DM) logging: ${modemLogging.optString("state")} at ${modemLogging.optString("directory")}")
+                    appendLine(
+                        if (includeModem) {
+                            "  $modemFileCount modem log file(s), ${modemBytes / 1024} KiB, in modem-dm/. " +
+                                "NOT redacted: they contain subscriber identifiers. Decode offline (for example with scat)."
+                        } else {
+                            "  Not included in this capture."
+                        },
+                    )
+                    appendLine()
                     appendLine("5G / EN-DC timeline (changes only, newest last):")
                     if (events.isEmpty()) appendLine("  none found") else events.forEach { appendLine("  $it") }
                     appendLine()
@@ -680,7 +736,10 @@ class PrivilegedService : RootService() {
                 return JSONObject()
                     .put("ok", true)
                     .put("message", "Captured ${files.length()} file(s).")
-                    .put("bytes", total)
+                    .put("bytes", total + modemBytes)
+                    .put("modemFiles", modemFileCount)
+                    .put("modemBytes", modemBytes)
+                    .put("modemState", modemLogging.optString("state"))
                     .put("rilFiles", rilFileCount)
                     .put("rilDirectory", rilDir.path)
                     .put("files", files)
@@ -692,6 +751,71 @@ class PrivilegedService : RootService() {
             }
         }
 
+        private fun prop(name: String): String = runCommand("/system/bin/getprop", name).output.trim()
+
+        /** Where the vendor logger writes, accepted only inside /data/vendor. */
+        private fun modemLogDirectory(): File {
+            val configured = prop(MODEM_LOG_LOCATION_PROP).ifBlank { DEFAULT_MODEM_LOG_DIR }
+            val canonical = runCatching { File(configured).canonicalPath }.getOrNull()
+            return if (canonical != null && canonical.startsWith("$VENDOR_DATA_ROOT/")) File(canonical) else File(DEFAULT_MODEM_LOG_DIR)
+        }
+
+        /**
+         * Shannon DM logging as the vendor properties and the log directory show it. Reads only;
+         * the file listing gives the size the next capture would include.
+         */
+        private fun modemLoggingStatus(): JSONObject {
+            val persist = prop(MODEM_LOGGING_PERSIST_PROP)
+            val live = prop("vendor.sys.modem.logging.enable")
+            val status = prop("vendor.sys.modem.logging.status")
+            val location = prop(MODEM_LOG_LOCATION_PROP)
+            val state = RadioLogDigest.modemLoggingState(persist, live, status, location)
+            val dir = modemLogDirectory()
+            val logs = radioFiles(dir, maxDepth = 3, allowedRoot = VENDOR_DATA_ROOT, limit = MODEM_LOG_FILE_COUNT_LIMIT)
+            return JSONObject()
+                .put("ok", state != RadioLogDigest.ModemLoggingState.UNSUPPORTED)
+                .put("state", state.name)
+                .put("requested", persist)
+                .put("live", live)
+                .put("status", status)
+                .put("directory", dir.path)
+                .put("ringBuffers", prop("persist.vendor.sys.modem.logging.br_num"))
+                .put("files", logs.size)
+                .put("bytes", logs.sumOf { it.length() })
+        }
+
+        /**
+         * Flips only `persist.vendor.sys.modem.logging.enable`, the switch the vendor init
+         * watches, then waits briefly for the logger to report back. Nothing else is written;
+         * if the logger does not start, the result says so instead of assuming it did.
+         */
+        private fun switchModemLogging(enable: Boolean): JSONObject {
+            val before = modemLoggingStatus()
+            if (before.getString("state") == RadioLogDigest.ModemLoggingState.UNSUPPORTED.name) {
+                return before.put("ok", false).put("message", "This build does not expose Shannon modem logging properties.")
+            }
+            val set = runCommand("/system/bin/setprop", MODEM_LOGGING_PERSIST_PROP, enable.toString())
+            if (set.exitCode != 0) {
+                return before.put("ok", false).put("message", "setprop was refused: ${set.output.trim().take(200)}")
+            }
+            val target = if (enable) RadioLogDigest.ModemLoggingState.RUNNING else RadioLogDigest.ModemLoggingState.OFF
+            var now = modemLoggingStatus()
+            val deadline = System.currentTimeMillis() + MODEM_LOGGING_SETTLE_MS
+            while (now.getString("state") != target.name && System.currentTimeMillis() < deadline) {
+                Thread.sleep(500)
+                now = modemLoggingStatus()
+            }
+            val reached = now.getString("state") == target.name
+            val message = when {
+                reached && enable -> "Modem logging is running."
+                reached -> "Modem logging is off."
+                enable -> "Requested, but the vendor logger has not reported running yet. Check again in a minute; " +
+                    "if it stays this way, this build ignores the switch."
+                else -> "Requested off, but the vendor logger still reports running."
+            }
+            return now.put("ok", reached).put("message", message)
+        }
+
         /** The RIL's configured log directory, accepted only inside /data/vendor/radio. */
         private fun radioLogDirectory(): File {
             val configured = runCommand("/system/bin/getprop", "persist.vendor.ril.log.base_dir").output.trim()
@@ -701,15 +825,20 @@ class PrivilegedService : RootService() {
         }
 
         /** Regular files under [root], newest first, never following symlinks out of it. */
-        private fun radioFiles(root: File, maxDepth: Int = 3): List<File> {
+        private fun radioFiles(
+            root: File,
+            maxDepth: Int = 3,
+            allowedRoot: String = RADIO_DATA_ROOT,
+            limit: Int = RADIO_LOG_FILE_COUNT_LIMIT,
+        ): List<File> {
             val base = runCatching { root.canonicalFile }.getOrNull() ?: return emptyList()
-            if (!base.isDirectory || !base.path.startsWith("$RADIO_DATA_ROOT/")) return emptyList()
+            if (!base.isDirectory || !base.path.startsWith("$allowedRoot/")) return emptyList()
             return base.walkTopDown()
                 .maxDepth(maxDepth)
                 .filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) }
                 .filter { runCatching { it.canonicalPath.startsWith(base.path + "/") }.getOrDefault(false) }
                 .sortedByDescending { it.lastModified() }
-                .take(RADIO_LOG_FILE_COUNT_LIMIT)
+                .take(limit)
                 .toList()
         }
 
@@ -1111,6 +1240,16 @@ class PrivilegedService : RootService() {
         private const val RADIO_LOG_FILE_LIMIT = 16 * 1024 * 1024
         private const val RADIO_LOG_TOTAL_LIMIT = 64L * 1024 * 1024
         private const val RADIO_LOG_FILE_COUNT_LIMIT = 40
+        private const val VENDOR_DATA_ROOT = "/data/vendor"
+        private const val DEFAULT_MODEM_LOG_DIR = "$VENDOR_DATA_ROOT/slog"
+        private const val MODEM_LOG_LOCATION_PROP = "ro.vendor.sys.modem.logging.loc"
+        private const val MODEM_LOGGING_PERSIST_PROP = "persist.vendor.sys.modem.logging.enable"
+        private const val MODEM_LOGGING_SETTLE_MS = 8_000L
+        private const val MODEM_LOG_FILE_COUNT_LIMIT = 60
+
+        // Binary DM logs are copied whole (a cut file does not decode); larger ones are skipped.
+        private const val MODEM_LOG_FILE_LIMIT = 128L * 1024 * 1024
+        private const val MODEM_LOG_TOTAL_LIMIT = 512L * 1024 * 1024
         private const val KSUD = "/data/adb/ksud"
         private const val APD = "/data/adb/apd"
         private val TENSOR_DEVICES = setOf(

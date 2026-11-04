@@ -18,5 +18,7 @@ interface IPrivilegedService {
     String applyRootVoWifiRepair(int subscriptionId);
     String restoreRootVoWifiRepair(int subscriptionId);
     boolean setImsStatusBarMonitoring(boolean enabled, in int[] subscriptionIds);
-    String captureRadioLogs(in ParcelFileDescriptor output, boolean redact);
+    String captureRadioLogs(in ParcelFileDescriptor output, boolean redact, boolean includeModem);
+    String getModemLoggingStatus();
+    String setModemLogging(boolean enable);
 }

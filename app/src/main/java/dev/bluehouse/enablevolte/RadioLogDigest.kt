@@ -141,6 +141,27 @@ object RadioLogDigest {
 
     private const val BOOT_WINDOW_MS = 15 * 60 * 1000L
 
+    /** Shannon modem diagnostic (DM) logging, as the vendor properties report it. */
+    enum class ModemLoggingState { UNSUPPORTED, OFF, STARTING, RUNNING, STOPPING }
+
+    /**
+     * Reads the state from the requested switch ([persist], `persist.vendor.sys.modem.logging.enable`),
+     * the live switch ([live], `vendor.sys.modem.logging.enable`) and the logger's own [status]
+     * (`vendor.sys.modem.logging.status`). Only "running" when the logger itself says so; a
+     * request the vendor init has not acted on stays "starting", never assumed to work.
+     */
+    fun modemLoggingState(persist: String, live: String, status: String, location: String): ModemLoggingState {
+        fun on(v: String) = v.trim().equals("true", ignoreCase = true) || v.trim() == "1"
+        if (location.isBlank() && persist.isBlank() && live.isBlank()) return ModemLoggingState.UNSUPPORTED
+        val running = on(status)
+        return when {
+            on(persist) && running -> ModemLoggingState.RUNNING
+            on(persist) -> ModemLoggingState.STARTING
+            running || on(live) -> ModemLoggingState.STOPPING
+            else -> ModemLoggingState.OFF
+        }
+    }
+
     data class UecapSummary(
         val combos: Int,
         val endc: Int,

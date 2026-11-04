@@ -94,14 +94,32 @@ object PrivilegeManager {
      * Writes a ZIP of radio logs into [output] from the root service. Root only: the vendor
      * RIL and modem log directories are not readable through Shizuku.
      */
-    fun captureRadioLogs(output: android.os.ParcelFileDescriptor, redact: Boolean): String {
+    fun captureRadioLogs(output: android.os.ParcelFileDescriptor, redact: Boolean, includeModem: Boolean): String {
         if (activeMode != PrivilegeMode.ROOT || !isRootReady()) {
             return org.json.JSONObject()
                 .put("ok", false)
                 .put("message", "Root access is required to read the RIL and modem logs.")
                 .toString()
         }
-        return requireNotNull(rootBridge) { "Root service is not connected" }.captureRadioLogs(output, redact)
+        return requireNotNull(rootBridge) { "Root service is not connected" }.captureRadioLogs(output, redact, includeModem)
+    }
+
+    /** Shannon modem diagnostic logging state, as JSON from the root service. Root only. */
+    fun getModemLoggingStatus(): String = rootModemLoggingCall { it.getModemLoggingStatus() }
+
+    /** Asks the vendor logger to start or stop; the result reports what it actually did. Root only. */
+    fun setModemLogging(enable: Boolean): String = rootModemLoggingCall { it.setModemLogging(enable) }
+
+    private fun rootModemLoggingCall(block: (IPrivilegedService) -> String): String {
+        val bridge = rootBridge
+        if (activeMode != PrivilegeMode.ROOT || !isRootReady() || bridge == null) {
+            return org.json.JSONObject()
+                .put("ok", false)
+                .put("state", "UNSUPPORTED")
+                .put("message", "Root access is required to control modem logging.")
+                .toString()
+        }
+        return block(bridge)
     }
 
     fun getRootVoWifiStatus(subscriptionId: Int): RootVoWifiStatus =

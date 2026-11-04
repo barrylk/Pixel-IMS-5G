@@ -42,10 +42,12 @@ import dev.bluehouse.enablevolte.FieldTestReporter
 import dev.bluehouse.enablevolte.FieldTestResult
 import dev.bluehouse.enablevolte.MobileRadioIsolation
 import dev.bluehouse.enablevolte.MobileRadioIsolationSession
+import dev.bluehouse.enablevolte.ModemLoggingStatus
 import dev.bluehouse.enablevolte.PrivilegeManager
 import dev.bluehouse.enablevolte.PrivilegeMode
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.RadioLogCaptureResult
+import dev.bluehouse.enablevolte.RadioLogDigest
 import dev.bluehouse.enablevolte.RadioLogExport
 import dev.bluehouse.enablevolte.SubscriptionModer
 import dev.bluehouse.enablevolte.components.Panel
@@ -381,7 +383,8 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
 /**
  * Root-only capture of the vendor RIL and modem logs that explain an EN-DC decision.
  *
- * Read-only: it never enables logging or changes radio settings. The archive is saved to
+ * The capture is read-only. Modem DM logging is a separate switch that changes one vendor
+ * property, only after the user confirms. The archive is saved to
  * Downloads next to Field Test reports and can be shared from here.
  */
 @Suppress("ktlint:standard:function-naming")
@@ -395,6 +398,58 @@ private fun RadioLogCapturePanel() {
     var busy by remember { mutableStateOf(false) }
     var capture by remember { mutableStateOf<RadioLogCaptureResult?>(null) }
     var captureError by remember { mutableStateOf<String?>(null) }
+    var includeModem by rememberSaveable { mutableStateOf(false) }
+    var modemStatus by remember { mutableStateOf<ModemLoggingStatus?>(null) }
+    var modemBusy by remember { mutableStateOf(false) }
+    var modemMessage by remember { mutableStateOf<String?>(null) }
+    var confirmModem by remember { mutableStateOf(false) }
+    val modemState = modemStatus?.state
+    val modemSupported = modemState != null && modemState != RadioLogDigest.ModemLoggingState.UNSUPPORTED
+    val modemOn = modemState == RadioLogDigest.ModemLoggingState.RUNNING ||
+        modemState == RadioLogDigest.ModemLoggingState.STARTING
+
+    LaunchedEffect(rootReady) {
+        if (rootReady) modemStatus = runCatching { RadioLogExport.modemLoggingStatus() }.getOrNull()
+    }
+
+    fun switchModemLogging(enable: Boolean) {
+        modemBusy = true
+        modemMessage = null
+        scope.launch {
+            try {
+                val status = RadioLogExport.setModemLogging(enable)
+                modemStatus = status
+                modemMessage = status.message.ifBlank { null }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                modemMessage = failure.message ?: failure.javaClass.simpleName
+            } finally {
+                modemBusy = false
+            }
+        }
+    }
+
+    if (confirmModem) {
+        AlertDialog(
+            onDismissRequest = { confirmModem = false },
+            title = { Text(stringResource(R.string.modem_logging_confirm_title)) },
+            text = { Text(stringResource(R.string.modem_logging_confirm_text)) },
+            confirmButton = {
+                Button(onClick = {
+                    confirmModem = false
+                    switchModemLogging(true)
+                }) {
+                    Text(stringResource(R.string.modem_logging_confirm))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { confirmModem = false }) {
+                    Text(stringResource(R.string.modem_logging_cancel))
+                }
+            },
+        )
+    }
 
     Panel(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -436,6 +491,72 @@ private fun RadioLogCapturePanel() {
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+            if (rootReady) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(stringResource(R.string.modem_logging_title), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.modem_logging_summary, modemStatus?.directory?.ifBlank { null } ?: "/data/vendor/slog"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            stringResource(
+                                R.string.modem_logging_state,
+                                stringResource(
+                                    when (modemState) {
+                                        null -> R.string.modem_logging_state_unknown
+                                        RadioLogDigest.ModemLoggingState.UNSUPPORTED -> R.string.modem_logging_state_unsupported
+                                        RadioLogDigest.ModemLoggingState.OFF -> R.string.modem_logging_state_off
+                                        RadioLogDigest.ModemLoggingState.STARTING -> R.string.modem_logging_state_starting
+                                        RadioLogDigest.ModemLoggingState.RUNNING -> R.string.modem_logging_state_running
+                                        RadioLogDigest.ModemLoggingState.STOPPING -> R.string.modem_logging_state_stopping
+                                    },
+                                ),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        modemStatus?.takeIf { modemSupported }?.let { status ->
+                            Text(
+                                stringResource(R.string.modem_logging_files, status.files, Formatter.formatShortFileSize(context, status.bytes)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = modemOn,
+                        enabled = modemSupported && !busy && !modemBusy,
+                        onCheckedChange = { want -> if (want) confirmModem = true else switchModemLogging(false) },
+                    )
+                }
+                if (modemBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                modemMessage?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.modem_logging_include), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.modem_logging_include_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = includeModem && modemSupported,
+                        enabled = modemSupported && !busy,
+                        onCheckedChange = { includeModem = it },
+                    )
+                }
+                if (includeModem && modemSupported) {
+                    Text(
+                        stringResource(R.string.modem_logging_include_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Button(
                 enabled = rootReady && !busy,
@@ -445,13 +566,14 @@ private fun RadioLogCapturePanel() {
                     capture = null
                     scope.launch {
                         try {
-                            capture = RadioLogExport.capture(context, redact)
+                            capture = RadioLogExport.capture(context, redact, includeModem && modemSupported)
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (failure: Throwable) {
                             captureError = failure.message ?: failure.javaClass.simpleName
                         } finally {
                             busy = false
+                            modemStatus = runCatching { RadioLogExport.modemLoggingStatus() }.getOrNull() ?: modemStatus
                         }
                     }
                 },
@@ -509,6 +631,24 @@ private fun RadioLogCapturePanel() {
                     result.uecap.takeLast(4).forEach {
                         Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                     }
+                }
+                if (result.modemFiles > 0) {
+                    Text(
+                        stringResource(
+                            R.string.modem_logging_captured,
+                            result.modemFiles,
+                            Formatter.formatShortFileSize(context, result.modemBytes),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (modemOn) {
+                    Text(
+                        stringResource(R.string.modem_logging_turn_off_reminder),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
                 if (result.skipped > 0) {
                     Text(

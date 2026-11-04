@@ -149,6 +149,17 @@ class RadioLogDigestTest {
         assertEquals("boot time unknown", RadioLogDigest.bootRelation(boot, 0))
     }
 
+    @Test
+    fun modemLoggingIsRunningOnlyWhenTheLoggerSaysSo() {
+        val loc = "/data/vendor/slog"
+        assertEquals(RadioLogDigest.ModemLoggingState.OFF, RadioLogDigest.modemLoggingState("false", "false", "false", loc))
+        assertEquals(RadioLogDigest.ModemLoggingState.STARTING, RadioLogDigest.modemLoggingState("true", "false", "false", loc))
+        assertEquals(RadioLogDigest.ModemLoggingState.STARTING, RadioLogDigest.modemLoggingState("true", "true", "", loc))
+        assertEquals(RadioLogDigest.ModemLoggingState.RUNNING, RadioLogDigest.modemLoggingState("true", "true", "true", loc))
+        assertEquals(RadioLogDigest.ModemLoggingState.STOPPING, RadioLogDigest.modemLoggingState("false", "true", "true", loc))
+        assertEquals(RadioLogDigest.ModemLoggingState.UNSUPPORTED, RadioLogDigest.modemLoggingState("", "", "", ""))
+    }
+
     private fun combo(vararg bands: Int): ByteArray = message {
         bands.forEach { band -> bytes(1, message { varint(1, band.toLong()) }) }
     }

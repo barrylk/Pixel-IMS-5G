@@ -23,7 +23,32 @@ data class RadioLogCaptureResult(
     val endcEvents: List<String>,
     val uecap: List<String>,
     val bootTime: String,
+    val modemFiles: Int,
+    val modemBytes: Long,
 )
+
+/** Shannon modem diagnostic logging as the root service reports it. */
+data class ModemLoggingStatus(
+    val state: RadioLogDigest.ModemLoggingState,
+    val directory: String,
+    val files: Int,
+    val bytes: Long,
+    val message: String,
+) {
+    companion object {
+        fun parse(raw: String): ModemLoggingStatus {
+            val json = JSONObject(raw)
+            return ModemLoggingStatus(
+                state = runCatching { RadioLogDigest.ModemLoggingState.valueOf(json.optString("state")) }
+                    .getOrDefault(RadioLogDigest.ModemLoggingState.UNSUPPORTED),
+                directory = json.optString("directory"),
+                files = json.optInt("files"),
+                bytes = json.optLong("bytes"),
+                message = json.optString("message"),
+            )
+        }
+    }
+}
 
 /**
  * Saves a root radio-log ZIP to Downloads/Pixel IMS 5G, next to Field Test reports.
@@ -32,7 +57,15 @@ data class RadioLogCaptureResult(
  * it, so the root process never creates files the app cannot read or share.
  */
 object RadioLogExport {
-    suspend fun capture(context: Context, redact: Boolean): RadioLogCaptureResult = withContext(Dispatchers.IO) {
+    suspend fun modemLoggingStatus(): ModemLoggingStatus = withContext(Dispatchers.IO) {
+        ModemLoggingStatus.parse(PrivilegeManager.getModemLoggingStatus())
+    }
+
+    suspend fun setModemLogging(enable: Boolean): ModemLoggingStatus = withContext(Dispatchers.IO) {
+        ModemLoggingStatus.parse(PrivilegeManager.setModemLogging(enable))
+    }
+
+    suspend fun capture(context: Context, redact: Boolean, includeModem: Boolean): RadioLogCaptureResult = withContext(Dispatchers.IO) {
         val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val fileName = "PixelIMS5G-radio-logs-$timestamp.zip"
         val resolver = context.contentResolver
@@ -51,7 +84,7 @@ object RadioLogExport {
             }
             // Binder hands the root service its own copy of the descriptor, which it closes
             // after writing; this process closes its copy here.
-            val json = JSONObject(descriptor.use { PrivilegeManager.captureRadioLogs(it, redact) })
+            val json = JSONObject(descriptor.use { PrivilegeManager.captureRadioLogs(it, redact, includeModem) })
             check(json.optBoolean("ok")) { json.optString("message").ifBlank { "Radio log capture failed." } }
             values.clear()
             values.put(MediaStore.Downloads.IS_PENDING, 0)
@@ -68,6 +101,8 @@ object RadioLogExport {
                 endcEvents = strings("endcEvents"),
                 uecap = strings("uecap"),
                 bootTime = json.optString("bootTime"),
+                modemFiles = json.optInt("modemFiles"),
+                modemBytes = json.optLong("modemBytes"),
             )
         } catch (error: Throwable) {
             resolver.delete(uri, null, null)
