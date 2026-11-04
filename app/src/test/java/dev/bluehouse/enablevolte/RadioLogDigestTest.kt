@@ -65,6 +65,90 @@ class RadioLogDigestTest {
         assertEquals("no band combinations", RadioLogDigest.decodeUecapLog(bytes)!!.describe())
     }
 
+    @Test
+    fun registrationDumpsAreNotEndcEvents() {
+        // 2.2.8 matched these because they print isEnDcAvailable; they are not events.
+        val log = "11-03 22:02:08.892  3391  3391 D SST-0   : handlePollStateResultMessage: PS cellular. " +
+            "NetworkRegistrationInfo{ domain=PS isDcNrRestricted = false isNrAvailable = true isEnDcAvailable = false }"
+        assertTrue(RadioLogDigest.endcEvents(log).isEmpty())
+    }
+
+    @Test
+    fun timelineRecordsOnlyChangesPerSlot() {
+        fun nri(time: String, nr: Boolean, endc: Boolean) =
+            "11-03 $time  3391  3391 D SST-0   : handlePollStateResultMessage: PS cellular. NetworkRegistrationInfo{ " +
+                "domain=PS isDcNrRestricted = false isNrAvailable = $nr isEnDcAvailable = $endc }"
+        val log = listOf(
+            nri("21:58:28.200", true, false),
+            nri("21:58:29.000", true, false),
+            "11-03 22:00:20.484  3391  3391 D NetworkTypeController: [0] Transition with primary timer from legacy to not_restricted_rrc_con",
+            "11-03 22:00:20.485  3391  3391 D DIC-0   : TelephonyDisplayInfo changed from TelephonyDisplayInfo {network=LTE, overrideNetwork=NONE} " +
+                "to TelephonyDisplayInfo {network=LTE, overrideNetwork=NR_NSA, isRoaming=false}",
+            nri("22:00:20.500", true, true),
+            nri("22:00:43.000", true, true),
+        ).joinToString("\n")
+        assertEquals(
+            listOf(
+                "11-03 21:58:28.200  SIM slot 0: NR advertised=true, EN-DC available=false",
+                "11-03 22:00:20.484  SIM slot 0: Transition with primary timer from legacy to not_restricted_rrc_con",
+                "11-03 22:00:20.485  SIM slot 0: status bar LTE / NR_NSA",
+                "11-03 22:00:20.500  SIM slot 0: NR advertised=true, EN-DC available=true",
+            ),
+            RadioLogDigest.nrTimeline(log),
+        )
+    }
+
+    @Test
+    fun timelineCarriesTheServingChannel() {
+        val line = "11-03 22:00:20.600  3391  3391 D SST-0   : combine mChannelNumber=400 domain=PS isNrAvailable = true isEnDcAvailable = true"
+        assertEquals(
+            listOf("11-03 22:00:20.600  SIM slot 0: NR advertised=true, EN-DC available=true (channel 400)"),
+            RadioLogDigest.nrTimeline(line),
+        )
+    }
+
+    @Test
+    fun aBurstOfReportsCollapsesToWhereItSettled() {
+        fun nri(time: String, endc: Boolean, tag: String = "SST-0") =
+            "11-03 $time  3391  3391 D $tag   : poll mChannelNumber=400 domain=PS isNrAvailable = true isEnDcAvailable = $endc"
+        val log = listOf(
+            nri("22:00:40.000", true),
+            // One change reported by several layers within ~100 ms, ending at false.
+            nri("22:00:42.306", false),
+            nri("22:00:42.339", true),
+            nri("22:00:42.340", false),
+            // An untagged repeat of the same state is ignored.
+            "11-03 22:00:42.347  3391  3391 D Other   : domain=PS isNrAvailable = true isEnDcAvailable = true",
+            // A flip that returns to the prior state within the burst window disappears.
+            nri("22:00:50.000", true),
+            nri("22:00:50.100", false),
+            "11-03 22:00:50.200  3391  3391 D SST-0   : poll mChannelNumber=65535 domain=PS isNrAvailable = true isEnDcAvailable = false",
+        ).joinToString("\n")
+        assertEquals(
+            listOf(
+                "11-03 22:00:40.000  SIM slot 0: NR advertised=true, EN-DC available=true (channel 400)",
+                "11-03 22:00:42.340  SIM slot 0: NR advertised=true, EN-DC available=false (channel 400)",
+            ),
+            RadioLogDigest.nrTimeline(log),
+        )
+    }
+
+    @Test
+    fun rilCapabilityEventsStayInTheTimeline() {
+        val line = "11-03 22:01:00.000  1327  1352 I SITRIL  : [MiscService] ENDCCapaInd Capability=0 Cause=7"
+        assertEquals(listOf(line), RadioLogDigest.nrTimeline(line))
+    }
+
+    @Test
+    fun capabilityLogsAreDatedAgainstTheLastBoot() {
+        val boot = 1_000_000_000L
+        val minute = 60_000L
+        assertEquals("before last boot", RadioLogDigest.bootRelation(boot - 60 * minute, boot))
+        assertEquals("at last boot", RadioLogDigest.bootRelation(boot + 3 * minute, boot))
+        assertEquals("since last boot", RadioLogDigest.bootRelation(boot + 60 * minute, boot))
+        assertEquals("boot time unknown", RadioLogDigest.bootRelation(boot, 0))
+    }
+
     private fun combo(vararg bands: Int): ByteArray = message {
         bands.forEach { band -> bytes(1, message { varint(1, band.toLong()) }) }
     }

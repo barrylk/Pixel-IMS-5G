@@ -22,6 +22,7 @@ data class RadioLogCaptureResult(
     val skipped: Int,
     val endcEvents: List<String>,
     val uecap: List<String>,
+    val bootTime: String,
 )
 
 /**
@@ -66,6 +67,7 @@ object RadioLogExport {
                 skipped = json.optJSONArray("skipped")?.length() ?: 0,
                 endcEvents = strings("endcEvents"),
                 uecap = strings("uecap"),
+                bootTime = json.optString("bootTime"),
             )
         } catch (error: Throwable) {
             resolver.delete(uri, null, null)

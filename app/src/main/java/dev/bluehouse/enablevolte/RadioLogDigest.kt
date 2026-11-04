@@ -26,7 +26,17 @@ object RadioLogDigest {
             "(?:[0-9a-f]{1,4}:){1,6}:(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,5})?)(?![0-9a-f:])",
     )
 
-    private val ENDC_EVENT = Regex("(?i)ENDCCapaInd|EndcCapability|endc[ _]?(?:capa|avail|disable|restrict)|scg[ _]?fail")
+    /**
+     * Real EN-DC capability signals only. The 2.2.8 pattern also matched `endc[ _]?avail`,
+     * which hits every registration dump that merely prints `isEnDcAvailable = …`.
+     */
+    private val ENDC_EVENT = Regex("ENDCCapaInd|OnEndcCapabilityReceived|EndcCapability(?:Ind|Changed)|(?i:scg[ _-]?fail)")
+    private val LOG_TIME = Regex("^(\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d\\.\\d{3})")
+    private val NR_FLAGS = Regex("isNrAvailable = (\\w+).*?isEnDcAvailable = (\\w+)")
+    private val SLOT_TAG = Regex("\\b(?:SST|NRM-C|DIC)-(\\d)\\b")
+    private val CHANNEL = Regex("mChannelNumber=(\\d+)|earfcn: (\\d+)|mEarfcn=(\\d+)")
+    private val NTC_EVENT = Regex("NetworkTypeController: \\[(\\d)] (Transition .*|Entering \\w+State)")
+    private val DISPLAY_CHANGE = Regex("DIC-(\\d)\\s*: TelephonyDisplayInfo changed from .* to TelephonyDisplayInfo \\{network=(\\w+), overrideNetwork=(\\w+)")
 
     fun redact(text: String): String =
         IPV6.replace(
@@ -55,6 +65,81 @@ object RadioLogDigest {
             .map { it.trim().take(300) }
             .toList()
             .takeLast(limit)
+
+    /**
+     * A 5G timeline from the radio log buffer, newest last: changes in NR-advertised and
+     * EN-DC-available per SIM slot (with the serving channel), NetworkTypeController
+     * transitions, status-bar 5G changes, and any explicit EN-DC capability or SCG failure
+     * lines. Repeated states are dropped, so the result reads as what changed and when.
+     */
+    fun nrTimeline(text: String, limit: Int = 60): List<String> {
+        val out = mutableListOf<String?>()
+        val lastFlags = mutableMapOf<String, String>()
+        val lastChannel = mutableMapOf<String, String>()
+        // The newest NR-flag entry per slot, so a burst of reports can be collapsed into it.
+        data class Pending(val index: Int, val timeMs: Long, val stateBefore: String?)
+        val pending = mutableMapOf<String, Pending>()
+        for (line in text.lineSequence()) {
+            val time = LOG_TIME.find(line)?.groupValues?.get(1) ?: continue
+            if (ENDC_EVENT.containsMatchIn(line)) {
+                out += line.trim().take(240)
+                continue
+            }
+            NTC_EVENT.find(line)?.let { m ->
+                out += "$time  SIM slot ${m.groupValues[1]}: ${m.groupValues[2].trim().take(120)}"
+            }
+            DISPLAY_CHANGE.find(line)?.let { m ->
+                out += "$time  SIM slot ${m.groupValues[1]}: status bar ${m.groupValues[2]} / ${m.groupValues[3]}"
+            }
+            val flags = NR_FLAGS.find(line)
+            // Untagged sources repeat a slot's state without saying which slot; skip them.
+            val slot = SLOT_TAG.find(line)?.groupValues?.get(1)
+            if (flags == null || slot == null || !line.contains("domain=PS")) continue
+            CHANNEL.find(line)?.groupValues?.drop(1)?.firstOrNull { it.isNotEmpty() && it != INVALID_CHANNEL }
+                ?.let { lastChannel[slot] = it }
+            val state = "NR advertised=${flags.groupValues[1]}, EN-DC available=${flags.groupValues[2]}"
+            if (lastFlags[slot] == state) continue
+            val entry = "$time  SIM slot $slot: $state${lastChannel[slot]?.let { " (channel $it)" }.orEmpty()}"
+            val now = timeMs(time)
+            val burst = pending[slot]?.takeIf { now - it.timeMs in 0..BURST_MS }
+            if (burst != null) {
+                // Several layers report one change within moments: keep only where it settled.
+                if (state == burst.stateBefore) {
+                    out[burst.index] = null
+                    pending.remove(slot)
+                } else {
+                    out[burst.index] = entry
+                }
+            } else {
+                pending[slot] = Pending(out.size, now, lastFlags[slot])
+                out += entry
+            }
+            lastFlags[slot] = state
+        }
+        return out.filterNotNull().takeLast(limit)
+    }
+
+    /** Milliseconds from a logcat `MM-dd HH:mm:ss.SSS` stamp, for ordering within a capture. */
+    private fun timeMs(stamp: String): Long {
+        val (date, clock) = stamp.split(' ')
+        val (month, day) = date.split('-').map { it.toLong() }
+        val (h, m, rest) = clock.split(':')
+        val seconds = rest.toDouble()
+        return ((((month * 31 + day) * 24 + h.toLong()) * 60 + m.toLong()) * 60_000) + (seconds * 1000).toLong()
+    }
+
+    private const val BURST_MS = 1_500L
+    private const val INVALID_CHANNEL = "65535"
+
+    /** Where a capability log was written relative to the last boot. */
+    fun bootRelation(writtenAtMs: Long, bootAtMs: Long): String = when {
+        bootAtMs <= 0 -> "boot time unknown"
+        writtenAtMs < bootAtMs - BOOT_WINDOW_MS -> "before last boot"
+        writtenAtMs <= bootAtMs + BOOT_WINDOW_MS -> "at last boot"
+        else -> "since last boot"
+    }
+
+    private const val BOOT_WINDOW_MS = 15 * 60 * 1000L
 
     data class UecapSummary(
         val combos: Int,
