@@ -7,6 +7,15 @@ import org.junit.Test
 
 class ReleaseChangelogTest {
     @Test
+    fun summaryFixReleaseHasBundledChangelog() {
+        val changelog = ReleaseChangelogCatalog.forVersion("v2.2.9")
+
+        assertEquals("2.2.9", changelog?.version)
+        assertTrue(changelog.orEmptyItems().any { it.title.contains("radio log summary") })
+        assertTrue(changelog.orEmptyItems().any { it.tone == ChangelogTone.IMPORTANT && it.title.contains("Pixel 10 Pro XL") })
+    }
+
+    @Test
     fun radioLogReleaseHasBundledChangelog() {
         val changelog = ReleaseChangelogCatalog.forVersion("v2.2.8")
 

@@ -21,6 +21,27 @@ data class InstalledChangelog(
 object ReleaseChangelogCatalog {
     fun forVersion(version: String): InstalledChangelog? =
         when (version.removePrefix("v")) {
+            "2.2.9" ->
+                InstalledChangelog(
+                    version = "2.2.9",
+                    items = listOf(
+                        ChangelogItem(
+                            title = "Clearer radio log summary",
+                            detail = "The 5G and EN-DC timeline now lists only real changes: NR advertised and EN-DC available per SIM with the serving channel, 5G state transitions and status-bar 5G changes. Ordinary registration lines no longer appear as false events.",
+                            tone = ChangelogTone.FIX,
+                        ),
+                        ChangelogItem(
+                            title = "Last boot and capability log timing",
+                            detail = "The capture shows when the phone last booted and marks each modem capability log as at, since or before the last boot, so a capability written during startup is easy to spot.",
+                            tone = ChangelogTone.IMPROVEMENT,
+                        ),
+                        ChangelogItem(
+                            title = "Pixel 10 Pro XL 5G is still under investigation",
+                            detail = "This release improves the diagnostic capture; it does not fix the Pixel 10 Pro XL staying on LTE where other phones get 5G.",
+                            tone = ChangelogTone.IMPORTANT,
+                        ),
+                    ),
+                )
             "2.2.8" ->
                 InstalledChangelog(
                     version = "2.2.8",

@@ -1,5 +1,13 @@
 # Changelog
 
+### 2.2.9 - clearer radio log summary
+
+- Fixes the radio log summary's EN-DC list, which in 2.2.8 matched ordinary registration lines that merely print `isEnDcAvailable`.
+- New 5G / EN-DC timeline with changes only: NR advertised and EN-DC available per SIM with the serving channel, NetworkTypeController transitions, status-bar 5G changes, RIL EN-DC capability lines and SCG failures. Bursts of duplicate reports collapse to where they settled.
+- Shows the last boot time and marks each modem capability log as at, since or before the last boot.
+- The Pixel 10 Pro XL 5G issue remains open.
+- See the [release notes](.github/release-notes/v2.2.9.md).
+
 ### 2.2.8 - radio log capture
 
 - New root-only **Radio log capture** in Field Test: saves the vendor RIL logs (sit-ril), the modem's UE-capability logs, extended radio logs, the radio log buffer and telephony state to a ZIP in Downloads, with a Share button. Read-only; nothing is enabled or changed.

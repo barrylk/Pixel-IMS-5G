@@ -478,6 +478,13 @@ private fun RadioLogCapturePanel() {
                     ),
                     style = MaterialTheme.typography.titleMedium,
                 )
+                if (result.bootTime.isNotBlank()) {
+                    Text(
+                        stringResource(R.string.radio_logs_last_boot, result.bootTime),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (result.rilFiles == 0) {
                     Text(
                         stringResource(R.string.radio_logs_no_ril, result.rilDirectory),
@@ -493,7 +500,7 @@ private fun RadioLogCapturePanel() {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    result.endcEvents.takeLast(6).forEach {
+                    result.endcEvents.takeLast(8).forEach {
                         Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                     }
                 }

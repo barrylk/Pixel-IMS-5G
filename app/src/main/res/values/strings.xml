@@ -474,8 +474,9 @@
     <string name="radio_logs_root_only">Root mode is required. Shizuku cannot read the RIL or modem log folders.</string>
     <string name="radio_logs_saved">Saved %1$s (%2$d files, %3$s)</string>
     <string name="radio_logs_no_ril">No RIL log files were found in %1$s. RIL logging may be disabled on this build; nothing was changed.</string>
-    <string name="radio_logs_endc_events">EN-DC capability events (newest last)</string>
-    <string name="radio_logs_endc_none">No EN-DC capability events in the captured logs.</string>
+    <string name="radio_logs_endc_events">5G and EN-DC timeline (changes only, newest last)</string>
+    <string name="radio_logs_endc_none">No 5G or EN-DC changes in the captured logs.</string>
+    <string name="radio_logs_last_boot">Last boot: %1$s</string>
     <string name="radio_logs_uecap">Modem capability logs</string>
     <string name="radio_logs_skipped">%1$d file(s) skipped; see 00-summary.txt in the archive.</string>
     <string name="radio_logs_share">Share log archive</string>

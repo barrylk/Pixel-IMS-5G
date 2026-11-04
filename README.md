@@ -2,7 +2,7 @@
 
 IMS controls, radio configuration and live network diagnostics for Google Tensor Pixel phones, with **Root** and **Shizuku** backends.
 
-[**Download 2.2.8**](https://github.com/barrylk/Pixel-IMS-5G/releases/download/v2.2.8/Pixel-IMS-5G-v2.2.8.apk) · [Release notes](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v2.2.8) · [Install and update guide](docs/release-guide.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/barrylk/Pixel-IMS-5G/issues)
+[**Download 2.2.9**](https://github.com/barrylk/Pixel-IMS-5G/releases/download/v2.2.9/Pixel-IMS-5G-v2.2.9.apk) · [Release notes](https://github.com/barrylk/Pixel-IMS-5G/releases/tag/v2.2.9) · [Install and update guide](docs/release-guide.md) · [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/barrylk/Pixel-IMS-5G/issues)
 
 <p align="center">
   <a href="https://github.com/barrylk/Pixel-IMS-5G/blob/main/assets/promo/pixel-ims-5g-promo.mp4">
@@ -12,9 +12,11 @@ IMS controls, radio configuration and live network diagnostics for Google Tensor
   <sub><a href="https://github.com/barrylk/Pixel-IMS-5G/blob/main/assets/promo/pixel-ims-5g-promo.mp4">Watch the promo with sound</a> · <a href="https://github.com/barrylk/Pixel-IMS-5G/blob/main/assets/promo/pixel-ims-5g-promo-vertical.mp4">9:16 vertical</a></sub>
 </p>
 
-## Current release: 2.2.8
+## Current release: 2.2.9
 
-**2.2.8 adds root radio log capture to Field Test**: one tap saves the vendor RIL logs, the modem's capability logs and radio state to a ZIP in Downloads, shows the modem's EN-DC capability events with cause codes, and redacts identifiers by default. It uses version code **40** and application ID `com.nirmala.pixel5gims`, so it updates existing public installations in place.
+**2.2.9 makes the radio log summary readable**: a 5G / EN-DC timeline of real changes only, plus the last boot time and when each modem capability log was written. It uses version code **41** and updates existing public installations in place.
+
+**2.2.8 added root radio log capture to Field Test**: one tap saves the vendor RIL logs, the modem's capability logs and radio state to a ZIP in Downloads, shows the modem's EN-DC capability events with cause codes, and redacts identifiers by default. Application ID `com.nirmala.pixel5gims`.
 
 2.2.7 Liquid, included in this release, was a complete redesign with a far more detailed live network monitor:
 
@@ -44,7 +46,7 @@ KernelSU users must grant Superuser access to Pixel IMS 5G. This app's single-fi
 
 ## Install or update
 
-1. Download [Pixel-IMS-5G-v2.2.8.apk](https://github.com/barrylk/Pixel-IMS-5G/releases/download/v2.2.8/Pixel-IMS-5G-v2.2.8.apk).
+1. Download [Pixel-IMS-5G-v2.2.9.apk](https://github.com/barrylk/Pixel-IMS-5G/releases/download/v2.2.9/Pixel-IMS-5G-v2.2.9.apk).
 2. Install it over an existing public GitHub release, or install it as a new app.
 3. Open Pixel IMS 5G, choose Root or Shizuku and approve access in that manager.
 4. Select the intended SIM and review Setup. Start with **Automatic** bands and a normal LTE + NR preference.

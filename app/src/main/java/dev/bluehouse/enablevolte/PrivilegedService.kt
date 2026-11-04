@@ -568,6 +568,12 @@ class PrivilegedService : RootService() {
             val rilDir = radioLogDirectory()
             var rilFileCount = 0
             val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+            // /proc/uptime gives seconds since boot; the modem's capability logs are judged
+            // against this, because an empty capability written at boot is a key lead.
+            val uptimeMs = runCatching {
+                (File("/proc/uptime").readText().trim().substringBefore(' ').toDouble() * 1000).toLong()
+            }.getOrDefault(0L)
+            val bootAtMs = if (uptimeMs > 0) System.currentTimeMillis() - uptimeMs else 0L
 
             ZipOutputStream(BufferedOutputStream(ParcelFileDescriptor.AutoCloseOutputStream(output))).use { zip ->
                 fun put(name: String, bytes: ByteArray, redacted: Boolean) {
@@ -611,7 +617,8 @@ class PrivilegedService : RootService() {
                         val bytes = readTail(file, RADIO_LOG_FILE_LIMIT)
                         put("modem-uecap/${file.name}", bytes, false)
                         val described = RadioLogDigest.decodeUecapLog(bytes)?.describe() ?: "unreadable"
-                        uecap.put("${stamp.format(Date(file.lastModified()))}  ${file.name}: $described")
+                        val relation = RadioLogDigest.bootRelation(file.lastModified(), bootAtMs)
+                        uecap.put("${stamp.format(Date(file.lastModified()))} [$relation]  ${file.name}: $described")
                     }
 
                 // Extended radio logs (text).
@@ -624,18 +631,25 @@ class PrivilegedService : RootService() {
 
                 // Android-side radio state at the time of capture.
                 val radioBuffer = runCommand("/system/bin/logcat", "-b", "radio", "-d", "-v", "threadtime").output
-                endcEvents += RadioLogDigest.endcEvents(radioBuffer)
+                endcEvents += RadioLogDigest.nrTimeline(radioBuffer)
                 putText("logcat-radio.txt", radioBuffer)
                 putText("telephony-registry.txt", runCommand("/system/bin/dumpsys", "telephony.registry").output)
                 put("radio-properties.txt", extractRadioProperties(runCommand("/system/bin/getprop").output).toByteArray(), true)
 
-                val events = endcEvents.distinct().takeLast(40).map { if (redact) RadioLogDigest.redact(it) else it }
+                val events = endcEvents.distinct().takeLast(60).map { if (redact) RadioLogDigest.redact(it) else it }
                 val summary = buildString {
                     appendLine("Pixel IMS 5G radio log capture")
                     appendLine("Captured: ${stamp.format(Date())}")
                     appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE}), Android ${Build.VERSION.RELEASE}")
                     appendLine("Baseband: ${runCommand("/system/bin/getprop", "gsm.version.baseband").output.trim()}")
                     appendLine("Redacted: $redact")
+                    appendLine(
+                        if (bootAtMs > 0) {
+                            "Last boot: ${stamp.format(Date(bootAtMs))} (up ${"%.1f".format(Locale.US, uptimeMs / 3_600_000.0)} h)"
+                        } else {
+                            "Last boot: unknown"
+                        },
+                    )
                     appendLine()
                     appendLine("Vendor RIL log directory: ${rilDir.path}")
                     appendLine(
@@ -646,10 +660,10 @@ class PrivilegedService : RootService() {
                         },
                     )
                     appendLine()
-                    appendLine("EN-DC capability events (newest last):")
+                    appendLine("5G / EN-DC timeline (changes only, newest last):")
                     if (events.isEmpty()) appendLine("  none found") else events.forEach { appendLine("  $it") }
                     appendLine()
-                    appendLine("Modem UE-capability logs (oldest first):")
+                    appendLine("Modem UE-capability logs (oldest first; an empty one at last boot is a key lead):")
                     if (uecap.length() == 0) appendLine("  none found")
                     for (i in 0 until uecap.length()) appendLine("  ${uecap.getString(i)}")
                     if (skipped.length() > 0) {
@@ -672,6 +686,7 @@ class PrivilegedService : RootService() {
                     .put("files", files)
                     .put("skipped", skipped)
                     .put("endcEvents", JSONArray(events))
+                    .put("bootTime", if (bootAtMs > 0) stamp.format(Date(bootAtMs)) else "")
                     .put("uecap", uecap)
                     .toString()
             }
