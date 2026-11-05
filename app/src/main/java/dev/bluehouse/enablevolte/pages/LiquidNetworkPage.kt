@@ -20,6 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.filled.Insights
+import dev.bluehouse.enablevolte.components.IconDot
+import dev.bluehouse.enablevolte.components.GlassIconButton
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -129,6 +132,7 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PageTitle("Network") {
+            GlassIconButton(Icons.Filled.Insights, "Deep diagnostics", { navController.navigate("network/diagnostics") })
             GlassPill(if (ui.sampling) "Live" else "Paused", if (ui.sampling && ui.available) good else caution) {
                 userPaused = !userPaused
                 if (userPaused) vm.stop() else vm.start()
@@ -256,13 +260,18 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
         }
 
         GroupCard {
+            ListRow(
+                "Deep diagnostics",
+                subtitle = "Attach trace, physical channels, carrier settings",
+                onClick = { navController.navigate("network/diagnostics") },
+                leading = { IconDot(Icons.Filled.Insights, StatusTone.ACCENT) },
+            ) { Chevron() }
+            GroupDivider()
             ListRow("Nearby and other measured cells", subtitle = "${ui.neighbours.size} cells, not part of this SIM's carriers", onClick = { sheet = nearbyListSheet(ui) }) { Chevron() }
             GroupDivider()
             ListRow("Connection history", subtitle = "${ui.events.size} changes this session", onClick = { sheet = historySheet(ui, vm::clearLog) }) { Chevron() }
             GroupDivider()
             ListRow("All measurements", subtitle = "Every value the modem reports", onClick = { sheet = allMeasurementsSheet(ui, name) }) { Chevron() }
-            GroupDivider()
-            ListRow("Deep diagnostics", subtitle = "Attach trace, physical channels, carrier settings", onClick = { navController.navigate("network/diagnostics") }) { Chevron() }
             GroupDivider()
             ListRow("How to read the measurements", onClick = { sheet = guideSheet() }) { Chevron() }
         }

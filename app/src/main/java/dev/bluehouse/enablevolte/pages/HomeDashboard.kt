@@ -22,6 +22,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -215,6 +217,22 @@ internal fun HomeDashboard(
                 subtitle = "Carrier settings for a SIM",
                 onClick = { onNavigate("controls") },
                 leading = { IconDot(Icons.Filled.Tune, StatusTone.ACCENT) },
+            ) { Chevron() }
+            if (selectedId != null) {
+                GroupDivider()
+                ListRow(
+                    "Bands",
+                    subtitle = "LTE and 5G bands for this SIM",
+                    onClick = { onNavigate("bands/$selectedId") },
+                    leading = { IconDot(Icons.Filled.SignalCellularAlt, StatusTone.ACCENT) },
+                ) { Chevron() }
+            }
+            GroupDivider()
+            ListRow(
+                "Deep diagnostics",
+                subtitle = "Attach trace, physical channels, carrier settings",
+                onClick = { onNavigate("network/diagnostics") },
+                leading = { IconDot(Icons.Filled.Insights, StatusTone.ACCENT) },
             ) { Chevron() }
             GroupDivider()
             ListRow(

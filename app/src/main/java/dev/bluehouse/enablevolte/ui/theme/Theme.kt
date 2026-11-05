@@ -13,7 +13,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
@@ -159,6 +161,9 @@ private val LightColorScheme =
  * 1.0.9 cut them to 10dp to look severe, which made panels read as boxes ruled
  * onto the page. Glass has thickness, and thickness has a radius.
  */
+/** Whole-UI scale so the concept reads at its intended size on a ~411 dp Pixel. */
+private const val UI_SCALE = 1.12f
+
 private val InstrumentShapes =
     Shapes(
         extraSmall = RoundedCornerShape(12.dp),
@@ -198,7 +203,12 @@ fun EnableVoLTETheme(
         }
     }
 
-    CompositionLocalProvider(LocalInstrument provides instrument) {
+    // The concept was laid out for a ~340 dp wide phone; Pixels are ~411 dp. Scaling the
+    // whole UI by 12% keeps the concept's proportions on a real screen, on top of the
+    // user's own font-size setting.
+    val base = LocalDensity.current
+    val scaled = Density(base.density * UI_SCALE, base.fontScale)
+    CompositionLocalProvider(LocalInstrument provides instrument, LocalDensity provides scaled) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,

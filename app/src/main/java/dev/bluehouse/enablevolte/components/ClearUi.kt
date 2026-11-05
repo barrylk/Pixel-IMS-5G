@@ -479,9 +479,9 @@ fun ReadingCell(
     note: String? = null,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = Mono)
-        if (!note.isNullOrBlank()) Text(note, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 11.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium, fontFamily = Mono)
+        if (!note.isNullOrBlank()) Text(note, fontSize = 10.sp, lineHeight = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

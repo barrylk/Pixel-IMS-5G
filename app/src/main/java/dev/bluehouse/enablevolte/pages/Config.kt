@@ -31,6 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.Icons
+import dev.bluehouse.enablevolte.components.IconDot
+import dev.bluehouse.enablevolte.components.Chevron
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -206,7 +210,6 @@ fun Config(
             ) { viewModel.setRadioMode(it) }
         },
         { NoteBox(radioWarning, StatusTone.WARNING, Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) },
-        { ClickablePropertyView(label = bandsLabel, value = "") { navController.navigate("bands/$subId") } },
         toggleRow(stringResource(R.string.enable_enhanced_4g_lte_plus), ConfigControls.FOUR_G_PLUS),
         toggleRow(stringResource(R.string.allow_adding_apns), ConfigControls.ALLOW_ADDING_APNS),
     )
@@ -284,6 +287,15 @@ fun Config(
                     )
                 }
             }
+        }
+
+        GroupCard(Modifier.padding(top = 4.dp)) {
+            ListRow(
+                bandsLabel,
+                subtitle = "Choose the LTE and 5G bands this SIM may use",
+                onClick = { navController.navigate("bands/$subId") },
+                leading = { IconDot(Icons.Filled.SignalCellularAlt, StatusTone.ACCENT) },
+            ) { Chevron() }
         }
 
         SectionPanel(title = stringResource(R.string.config_section_calling), rows = callingRows)
