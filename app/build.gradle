@@ -79,6 +79,9 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-core'
     // R8 strips the unused icons from this artifact in release builds.
     implementation 'androidx.compose.material:material-icons-extended'
+    // Real backdrop blur (RenderEffect, Android 12+) for the floating glass bars only.
+    // 1.6.x targets Compose 1.8, so it does not pull the BOM forward.
+    implementation 'dev.chrisbanes.haze:haze:1.6.10'
 
     def shizuku_version = "13.1.5"
     implementation "dev.rikka.shizuku:api:$shizuku_version"

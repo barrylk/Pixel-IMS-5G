@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import dev.bluehouse.enablevolte.components.BottomBarSpacer
 import dev.bluehouse.enablevolte.FieldTestReporter
 import dev.bluehouse.enablevolte.FieldTestResult
 import dev.bluehouse.enablevolte.MobileRadioIsolation
@@ -377,6 +378,7 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
                 }
             }
         }
+        BottomBarSpacer()
     }
 }
 

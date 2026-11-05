@@ -23,10 +23,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.bluehouse.enablevolte.components.BottomBarSpacer
+import dev.bluehouse.enablevolte.components.floatingGlass
+import dev.bluehouse.enablevolte.components.calmSurface
 import dev.bluehouse.enablevolte.*
-import dev.bluehouse.enablevolte.components.GlassDepth
 import dev.bluehouse.enablevolte.components.LiquidPane
-import dev.bluehouse.enablevolte.components.liquidGlass
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -72,11 +73,11 @@ internal fun HomeDashboard(
             }
         }
         if (sims.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().liquidGlass(RoundedCornerShape(28.dp), GlassDepth.THICK)
+            Row(Modifier.fillMaxWidth().floatingGlass(RoundedCornerShape(28.dp))
                 .horizontalScroll(rememberScrollState()).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 sims.forEach { sim ->
                     val active = sim.id == selectedId
-                    Box(Modifier.then(if (active) Modifier.liquidGlass(RoundedCornerShape(23.dp), GlassDepth.TINTED, accent) else Modifier)
+                    Box(Modifier.then(if (active) Modifier.calmSurface(RoundedCornerShape(23.dp)) else Modifier)
                         .selectable(selected = active, role = Role.Tab, onClick = { onSelectSim(sim.id) }).padding(horizontal = 16.dp, vertical = 13.dp)) {
                         Text("${sim.name} · SIM ${sim.slot}", fontSize = 13.sp,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
@@ -142,6 +143,7 @@ internal fun HomeDashboard(
         }
         Text("Pixel IMS 5G · ${BuildConfig.VERSION_NAME}", fontSize = 10.sp, color = muted, modifier = Modifier.padding(horizontal = 3.dp))
         Spacer(Modifier.height(18.dp))
+        BottomBarSpacer()
     }
 }
 
@@ -154,7 +156,7 @@ internal fun HomeDashboard(
 }
 
 @Composable private fun HomeShortcut(title: String, detail: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    Column(modifier.liquidGlass(RoundedCornerShape(25.dp), GlassDepth.THICK).clickable(enabled = enabled, onClick = onClick)
+    Column(modifier.calmSurface(RoundedCornerShape(24.dp)).clickable(enabled = enabled, onClick = onClick)
         .padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Icon(icon, null, Modifier.size(23.dp), tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
         Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)

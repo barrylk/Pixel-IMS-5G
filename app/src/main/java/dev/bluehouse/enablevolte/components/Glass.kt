@@ -1,7 +1,9 @@
 package dev.bluehouse.enablevolte.components
 
+import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
@@ -15,6 +17,10 @@ import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.ui.theme.InstrumentColors
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 import kotlin.math.max
 
 /** How much of the ground a pane lets through. */
@@ -27,7 +33,54 @@ enum class GlassDepth {
 
     /** A tinted pane, used for the one call to action on a screen. */
     TINTED,
+
+    /** Floating controls over a real backdrop blur: a light body so the blur shows. */
+    FLOATING,
 }
+
+/**
+ * The content layer that floating glass blurs. Null where no source is set up, for
+ * example in dialogs; floating glass then falls back to its tinted body alone.
+ */
+val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
+
+/**
+ * Glass for what floats over content: the tab bar, top-bar controls and sheets.
+ * Blurs the content underneath for real (RenderEffect, Android 12+), then adds the
+ * pane's body, highlight and rim from [liquidGlass].
+ */
+@Composable
+fun Modifier.floatingGlass(
+    shape: Shape = MaterialTheme.shapes.large,
+    tint: Color = Color.Unspecified,
+): Modifier {
+    val inst = LocalInstrument.current
+    val haze = LocalHazeState.current
+    val ground = MaterialTheme.colorScheme.background
+    return this
+        .clip(shape)
+        .then(
+            if (haze != null) {
+                Modifier.hazeEffect(
+                    state = haze,
+                    style = HazeStyle(
+                        backgroundColor = ground,
+                        tints = listOf(HazeTint(inst.scrim.copy(alpha = if (inst.isDark) 0.45f else 0.55f))),
+                        blurRadius = 26.dp,
+                        noiseFactor = 0.06f,
+                    ),
+                )
+            } else {
+                Modifier
+            },
+        )
+        .liquidGlass(shape, if (haze != null) GlassDepth.FLOATING else GlassDepth.THICK, tint)
+}
+
+/** A calm, solid content card: no rim, no bloom. Glass is kept for what floats. */
+@Composable
+fun Modifier.calmSurface(shape: Shape = MaterialTheme.shapes.large): Modifier =
+    this.clip(shape).background(LocalInstrument.current.card, shape)
 
 /**
  * A pane of liquid glass.
@@ -104,6 +157,10 @@ private fun glassBody(inst: InstrumentColors, depth: GlassDepth, tint: Color): B
         GlassDepth.THICK -> {
             top = inst.scrim
             bottom = inst.scrim.copy(alpha = (inst.scrim.alpha - 0.08f).coerceAtLeast(0f))
+        }
+        GlassDepth.FLOATING -> {
+            top = inst.scrim.copy(alpha = inst.scrim.alpha * 0.35f)
+            bottom = inst.scrim.copy(alpha = inst.scrim.alpha * 0.2f)
         }
         GlassDepth.TINTED -> {
             val base = if (tint.isSpecified) tint else inst.glow

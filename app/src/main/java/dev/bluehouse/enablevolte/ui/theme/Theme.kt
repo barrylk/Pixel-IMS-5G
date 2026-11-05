@@ -46,6 +46,10 @@ data class InstrumentColors(
     /** Fill for bars that content scrolls beneath, where more opacity keeps text legible. */
     val scrim: Color,
     val pools: List<Color>,
+    /** Solid fill for content cards: readings, checks and settings. */
+    val card: Color,
+    /** Divider between rows inside a card. */
+    val hairline: Color,
     val isDark: Boolean,
 )
 
@@ -67,6 +71,8 @@ private val DarkInstrument =
         shade = ShadeDark,
         scrim = ScrimDark,
         pools = listOf(PoolCyanDark, PoolVioletDark, PoolEmberDark),
+        card = Hull,
+        hairline = Color(0x12FFFFFF),
         isDark = true,
     )
 
@@ -90,6 +96,8 @@ private val LightInstrument =
         shade = ShadeLight,
         scrim = ScrimLight,
         pools = listOf(PoolCyanLight, PoolVioletLight, PoolEmberLight),
+        card = PaperHull,
+        hairline = Color(0x1410141A),
         isDark = false,
     )
 

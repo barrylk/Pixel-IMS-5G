@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
@@ -13,77 +15,77 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 
 /**
- * The page ground, lit by three soft pools of light.
- *
- * The pools are not decoration. Panels are translucent, so whatever is behind
- * them decides whether they read as glass or as nothing at all — a flat ground
- * is what made earlier attempts look like outlines on a void. They are large
- * and smooth because Compose has no backdrop blur: a blurred smooth gradient
- * looks like the gradient, so the panes read as frosted without sampling.
+ * The page ground: the background colour with soft tinted light gathered at the top,
+ * like a wallpaper behind glass. Floating glass blurs this along with the content, so
+ * it is also drawn inside the blur source (see [appBackdropPaint]).
  */
+@Composable
+fun Modifier.appBackdropPaint(): Modifier {
+    val colors = MaterialTheme.colorScheme
+    val inst = LocalInstrument.current
+    val strength = if (inst.isDark) 0.55f else 0.85f
+    return this
+        .background(colors.background)
+        .drawWithCache {
+            val w = size.width
+            val h = size.height
+            val reach = maxOf(w, h)
+            val pools = listOf(
+                // A faint third pool low down gives the tab bar colour to blur.
+                Triple(inst.pools[0], Offset(0f, 0f), reach * 0.60f),
+                Triple(inst.pools[1], Offset(w, h * 0.06f), reach * 0.50f),
+                Triple(inst.pools[2], Offset(w * 0.5f, h * 1.02f), reach * 0.42f),
+            ).map { (color, center, radius) ->
+                Brush.radialGradient(
+                    0f to color.copy(alpha = strength),
+                    0.45f to color.copy(alpha = strength * 0.35f),
+                    1f to Color.Transparent,
+                    center = center,
+                    radius = radius,
+                )
+            }
+            val vignette = Brush.verticalGradient(
+                0.7f to Color.Transparent,
+                1f to Color.Black.copy(alpha = if (inst.isDark) 0.35f else 0f),
+            )
+            onDrawBehind {
+                pools.forEach { drawRect(it) }
+                drawRect(vignette)
+            }
+        }
+}
+
 @Composable
 fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val inst = LocalInstrument.current
-    val strength = if (inst.isDark) 0.34f else 0.55f
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.background)
-            .drawWithCache {
-                val w = size.width
-                val h = size.height
-                val reach = maxOf(w, h)
-                val pools = listOf(
-                    Triple(inst.pools[0], Offset(w * 0.05f, h * 0.06f), reach * 0.62f),
-                    Triple(inst.pools[1], Offset(w * 1.02f, h * 0.38f), reach * 0.55f),
-                    Triple(inst.pools[2], Offset(w * 0.20f, h * 0.92f), reach * 0.50f),
-                ).map { (color, center, radius) ->
-                    Brush.radialGradient(
-                        0f to color.copy(alpha = strength),
-                        0.45f to color.copy(alpha = strength * 0.35f),
-                        1f to Color.Transparent,
-                        center = center,
-                        radius = radius,
-                    )
-                }
-                val vignette = Brush.verticalGradient(
-                    0.7f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = if (inst.isDark) 0.35f else 0f),
-                )
-                onDrawBehind {
-                    pools.forEach { drawRect(it) }
-                    // Broad, quiet folds provide changing light behind translucent controls.
-                    // These are drawn once per size/theme, not animated every radio sample.
-                    val fold = Path().apply {
-                        moveTo(-w * .4f, h * .05f)
-                        cubicTo(w * .85f, h * .02f, -w * .1f, h * .48f, w * 1.2f, h * .62f)
-                    }
-                    drawPath(fold, Brush.linearGradient(listOf(Color.Transparent,
-                        inst.glow.copy(alpha = if (inst.isDark) .06f else .12f), Color.Transparent)),
-                        style = Stroke(width = w * .4f))
-                    drawPath(fold, Brush.linearGradient(listOf(Color.Transparent,
-                        Color.White.copy(alpha = if (inst.isDark) .045f else .30f), Color.Transparent)),
-                        style = Stroke(width = 1.5.dp.toPx()))
-                    drawRect(vignette)
-                }
-            },
-    ) {
+    Box(modifier = Modifier.fillMaxSize().appBackdropPaint()) {
         CompositionLocalProvider(LocalContentColor provides colors.onBackground) {
             content()
         }
     }
+}
+
+/**
+ * Space the floating tab bar covers at the bottom of a tab page. Tab pages scroll
+ * under the bar, so each one ends with a spacer this tall.
+ */
+val LocalBottomBarInset = compositionLocalOf { 0.dp }
+
+/** The end-of-page spacer for tab pages, so the last item clears the floating bar. */
+@Composable
+fun BottomBarSpacer() {
+    Spacer(Modifier.height(LocalBottomBarInset.current))
 }
 
 /**
@@ -102,9 +104,15 @@ fun Panel(
     val colors = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.large
 
+    // Content panels are calm solid cards; glass stays for tinted or floating panes.
     @Composable
     fun Body() {
-        Box(Modifier.liquidGlass(shape, depth, tint)) { content() }
+        val surface = if (depth == GlassDepth.REGULAR && !tint.isSpecified) {
+            Modifier.calmSurface(shape)
+        } else {
+            Modifier.liquidGlass(shape, depth, tint)
+        }
+        Box(surface) { content() }
     }
 
     if (onClick == null) {
@@ -144,6 +152,6 @@ fun RowDivider(inset: Boolean = true) {
     HorizontalDivider(
         modifier = Modifier.padding(start = if (inset) 16.dp else 0.dp),
         thickness = 1.dp,
-        color = LocalInstrument.current.edge,
+        color = LocalInstrument.current.hairline,
     )
 }

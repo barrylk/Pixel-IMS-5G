@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import dev.bluehouse.enablevolte.components.BottomBarSpacer
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.components.Panel
 import dev.bluehouse.enablevolte.components.PanelGroup
@@ -73,5 +74,6 @@ fun ControlsHub(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        BottomBarSpacer()
     }
 }

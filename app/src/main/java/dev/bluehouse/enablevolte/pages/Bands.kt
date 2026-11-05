@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import dev.bluehouse.enablevolte.components.BottomBarSpacer
 import dev.bluehouse.enablevolte.ui.theme.NumericSmallTextStyle
 import dev.bluehouse.enablevolte.components.statusToneColor
 import dev.bluehouse.enablevolte.components.StatusTone
@@ -601,5 +602,6 @@ fun Bands(
             }
             OutlinedButton(onClick = { loadSelection() }) { Text(stringResource(R.string.refresh)) }
         }
+        BottomBarSpacer()
     }
 }

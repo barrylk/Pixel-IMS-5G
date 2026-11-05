@@ -31,10 +31,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
+import dev.bluehouse.enablevolte.components.BottomBarSpacer
+import dev.bluehouse.enablevolte.components.floatingGlass
+import dev.bluehouse.enablevolte.components.calmSurface
 import dev.bluehouse.enablevolte.*
-import dev.bluehouse.enablevolte.components.GlassDepth
 import dev.bluehouse.enablevolte.components.Sparkline
-import dev.bluehouse.enablevolte.components.liquidGlass
 import dev.bluehouse.enablevolte.components.LiquidPane as LivePane
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 import java.text.SimpleDateFormat
@@ -95,16 +96,16 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Live network", fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.8).sp, modifier = Modifier.weight(1f))
-            Row(Modifier.liquidGlass(RoundedCornerShape(24.dp), GlassDepth.THICK).clickable { userPaused = !userPaused; if (userPaused) vm.stop() else vm.start() }.padding(horizontal = 15.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.floatingGlass(RoundedCornerShape(24.dp)).clickable { userPaused = !userPaused; if (userPaused) vm.stop() else vm.start() }.padding(horizontal = 15.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).background(if (ui.sampling && ui.available) good else caution, CircleShape))
                 Text(if (ui.sampling) "Live" else "Paused", fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
         }
-        Row(Modifier.fillMaxWidth().liquidGlass(RoundedCornerShape(28.dp), GlassDepth.THICK).horizontalScroll(rememberScrollState()).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth().floatingGlass(RoundedCornerShape(28.dp)).horizontalScroll(rememberScrollState()).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             subscriptions.forEach { sim ->
                 val selected = sim.subscriptionId == sub.subscriptionId
                 val label = liveCarrierName(sim.carrierName.toString(), "${sim.mccString}${sim.mncString}", "SIM ${sim.simSlotIndex + 1}")
-                Box(Modifier.then(if (selected) Modifier.liquidGlass(RoundedCornerShape(23.dp), GlassDepth.TINTED, accent) else Modifier).clickable { selectedId = sim.subscriptionId }.padding(horizontal = 16.dp, vertical = 13.dp)) {
+                Box(Modifier.then(if (selected) Modifier.calmSurface(RoundedCornerShape(23.dp)) else Modifier).clickable { selectedId = sim.subscriptionId }.padding(horizontal = 16.dp, vertical = 13.dp)) {
                     Text("$label · SIM ${sim.simSlotIndex + 1}", fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) accent else muted)
                 }
             }
@@ -211,6 +212,7 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
         Disclosure("Deep diagnostics", "Attach trace, physical channels and carrier settings") { navController.navigate("network/diagnostics") }
         if (ui.lastSampleAt > 0) Text("${if (ui.sampling && ui.available) "Updated" else "Last reading"} ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ui.lastSampleAt))} · ${ui.serviceState}", fontSize = 11.sp, color = muted, modifier = Modifier.padding(horizontal = 4.dp))
         Spacer(Modifier.height(18.dp))
+        BottomBarSpacer()
     }
     sheet?.let { details ->
         ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -259,7 +261,7 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
     }
 }
 @Composable private fun Disclosure(title: String, subtitle: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().liquidGlass(RoundedCornerShape(23.dp), GlassDepth.THICK).clickable(onClick = onClick).padding(horizontal = 17.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().calmSurface(RoundedCornerShape(23.dp)).clickable(onClick = onClick).padding(horizontal = 17.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp)

@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import dev.bluehouse.enablevolte.components.BottomBarSpacer
 import dev.bluehouse.enablevolte.BooleanControl
 import dev.bluehouse.enablevolte.ConfigControls
 import dev.bluehouse.enablevolte.ConfigUiState
@@ -329,6 +330,7 @@ fun Config(
         )
 
         Spacer(Modifier.height(28.dp))
+        BottomBarSpacer()
     }
 }
 

@@ -61,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,6 +94,12 @@ import dev.bluehouse.enablevolte.components.InfoDialog
 import dev.bluehouse.enablevolte.components.OnLifecycleEvent
 import dev.bluehouse.enablevolte.components.WhatsNewDialog
 import dev.bluehouse.enablevolte.components.liquidGlass
+import dev.bluehouse.enablevolte.components.LocalBottomBarInset
+import dev.bluehouse.enablevolte.components.LocalHazeState
+import dev.bluehouse.enablevolte.components.appBackdropPaint
+import dev.bluehouse.enablevolte.components.floatingGlass
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import dev.bluehouse.enablevolte.pages.About
 import dev.bluehouse.enablevolte.pages.Bands
 import dev.bluehouse.enablevolte.pages.Config
@@ -463,235 +470,264 @@ fun PixelIMSApp(
             },
         )
     }
-    Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = {
-                    val route = currentBackStackEntry?.destination?.route
-                    if (route in setOf("home", "controls", "network", "field-test")) {
-                        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                            Text(
-                                stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                stringResource(R.string.app_signature),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontStyle = FontStyle.Italic,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    } else {
-                        Text(
-                            currentBackStackEntry?.destination?.label?.toString()
-                                ?: stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    if (currentBackStackEntry?.destination?.depth?.let { it > 1 } == true) {
-                        IconButton(onClick = {
-                            navController.popBackStack()
-                        }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Go back",
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { onThemeModeChange(themeMode.next()) }) {
-                        Icon(
-                            when (themeMode) {
-                                ThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
-                                ThemeMode.LIGHT -> Icons.Filled.LightMode
-                                ThemeMode.DARK -> Icons.Filled.DarkMode
-                            },
-                            contentDescription = stringResource(
-                                when (themeMode) {
-                                    ThemeMode.SYSTEM -> R.string.appearance_system
-                                    ThemeMode.LIGHT -> R.string.appearance_light
-                                    ThemeMode.DARK -> R.string.appearance_dark
-                                },
-                            ),
-                        )
-                    }
-                    if (subscriptions.isNotEmpty()) {
-                        IconButton(
-                            onClick = { showRecoveryDialog = true },
-                        ) {
-                            Icon(Icons.Filled.PowerSettingsNew, contentDescription = stringResource(R.string.restore_and_reboot))
-                        }
-                    }
-                    if (currentBackStackEntry?.destination?.route != "home/about") {
-                        IconButton(
-                            onClick = { navController.navigate("home/about") },
-                        ) {
-                            Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.about))
-                        }
-                    }
-                    if (currentBackStackEntry?.destination?.route == "home") {
-                        IconButton(onClick = {
-                            loadApplication()
-                        }) {
-                            Icon(
-                                imageVector = Icons.Filled.Refresh,
-                                contentDescription = "Refresh contents",
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = LocalInstrument.current.scrim,
-                ),
-            )
-        },
-        bottomBar = {
-            val currentRoute = currentBackStackEntry?.destination?.route
-            if (currentRoute in setOf("home", "controls", "network", "field-test", "config/{subId}", "bands/{subId}")) {
-                val currentDestination = currentBackStackEntry?.destination
-                val items = arrayListOf(
-                    Screen("home", stringResource(R.string.setup), Icons.Filled.Home),
-                    Screen("controls", stringResource(R.string.controls), Icons.Filled.Tune),
-                    Screen("network", stringResource(R.string.network), Icons.Filled.SignalCellularAlt),
-                    Screen("field-test", stringResource(R.string.field_test_short), Icons.Filled.Science),
-                )
-                val inst = LocalInstrument.current
-                val barShape = RoundedCornerShape(30.dp)
-                val selectedIndex = items.indexOfFirst { screen ->
-                    when (screen.route) {
-                        "controls" -> currentRoute in setOf("controls", "config/{subId}", "bands/{subId}")
-                        else -> currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                    }
-                }
-                val lensPosition by animateFloatAsState(
-                    targetValue = selectedIndex.coerceAtLeast(0).toFloat(),
-                    animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
-                    label = "nav lens",
-                )
-                // A floating pane of thick glass, with a smaller lens of tinted
-                // glass that slides between tabs rather than jumping.
-                Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 10.dp)) {
-                    BoxWithConstraints(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(66.dp)
-                            .liquidGlass(barShape, GlassDepth.THICK)
-                            .padding(5.dp),
-                    ) {
-                        val slot = maxWidth / items.size
-                        if (selectedIndex >= 0) {
-                            Box(
-                                Modifier
-                                    .offset(x = slot * lensPosition)
-                                    .width(slot)
-                                    .fillMaxHeight()
-                                    .liquidGlass(RoundedCornerShape(25.dp), GlassDepth.TINTED, inst.glow),
-                            )
-                        }
-                        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                            items.forEachIndexed { index, screen ->
-                                val selected = index == selectedIndex
-                                val tint by animateColorAsState(
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    label = "nav tint",
+    val hazeState = rememberHazeState()
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        val route = currentBackStackEntry?.destination?.route
+                        if (route in setOf("home", "controls", "network", "field-test")) {
+                            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                                Text(
+                                    stringResource(R.string.app_name),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(25.dp))
-                                        .selectable(
-                                            selected = selected,
-                                            role = Role.Tab,
-                                            onClick = {
-                                                navController.navigate(screen.route) {
-                                                    popUpTo(navController.graph.findStartDestination().id) {
-                                                        saveState = true
-                                                    }
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
-                                            },
-                                        ),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
+                                Text(
+                                    stringResource(R.string.app_signature),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontStyle = FontStyle.Italic,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        } else {
+                            Text(
+                                currentBackStackEntry?.destination?.label?.toString()
+                                    ?: stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        if (currentBackStackEntry?.destination?.depth?.let { it > 1 } == true) {
+                            IconButton(onClick = {
+                                navController.popBackStack()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Go back",
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        // The top-bar buttons float in one glass capsule.
+                        Row(
+                            Modifier.padding(end = 10.dp).floatingGlass(RoundedCornerShape(26.dp)).padding(horizontal = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(onClick = { onThemeModeChange(themeMode.next()) }) {
+                                Icon(
+                                    when (themeMode) {
+                                        ThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
+                                        ThemeMode.LIGHT -> Icons.Filled.LightMode
+                                        ThemeMode.DARK -> Icons.Filled.DarkMode
+                                    },
+                                    contentDescription = stringResource(
+                                        when (themeMode) {
+                                            ThemeMode.SYSTEM -> R.string.appearance_system
+                                            ThemeMode.LIGHT -> R.string.appearance_light
+                                            ThemeMode.DARK -> R.string.appearance_dark
+                                        },
+                                    ),
+                                )
+                            }
+                            if (subscriptions.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { showRecoveryDialog = true },
                                 ) {
+                                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = stringResource(R.string.restore_and_reboot))
+                                }
+                            }
+                            if (currentBackStackEntry?.destination?.route != "home/about") {
+                                IconButton(
+                                    onClick = { navController.navigate("home/about") },
+                                ) {
+                                    Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.about))
+                                }
+                            }
+                            if (currentBackStackEntry?.destination?.route == "home") {
+                                IconButton(onClick = {
+                                    loadApplication()
+                                }) {
                                     Icon(
-                                        screen.icon,
-                                        contentDescription = null,
-                                        tint = tint,
-                                        modifier = Modifier.size(22.dp),
+                                        imageVector = Icons.Filled.Refresh,
+                                        contentDescription = "Refresh contents",
                                     )
-                                    Spacer(Modifier.height(3.dp))
-                                    Text(
-                                        screen.title,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = tint,
-                                        maxLines = 1,
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = LocalInstrument.current.scrim,
+                    ),
+                )
+            },
+            bottomBar = {
+                val currentRoute = currentBackStackEntry?.destination?.route
+                if (currentRoute in BAR_ROUTES) {
+                    val currentDestination = currentBackStackEntry?.destination
+                    val items = arrayListOf(
+                        Screen("home", stringResource(R.string.setup), Icons.Filled.Home),
+                        Screen("controls", stringResource(R.string.controls), Icons.Filled.Tune),
+                        Screen("network", stringResource(R.string.network), Icons.Filled.SignalCellularAlt),
+                        Screen("field-test", stringResource(R.string.field_test_short), Icons.Filled.Science),
+                    )
+                    val inst = LocalInstrument.current
+                    val barShape = RoundedCornerShape(30.dp)
+                    val selectedIndex = items.indexOfFirst { screen ->
+                        when (screen.route) {
+                            "controls" -> currentRoute in setOf("controls", "config/{subId}", "bands/{subId}")
+                            else -> currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                        }
+                    }
+                    val lensPosition by animateFloatAsState(
+                        targetValue = selectedIndex.coerceAtLeast(0).toFloat(),
+                        animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+                        label = "nav lens",
+                    )
+                    // A floating pane of thick glass, with a smaller lens of tinted
+                    // glass that slides between tabs rather than jumping.
+                    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 10.dp)) {
+                        BoxWithConstraints(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(66.dp)
+                                .floatingGlass(barShape)
+                                .padding(5.dp),
+                        ) {
+                            val slot = maxWidth / items.size
+                            if (selectedIndex >= 0) {
+                                Box(
+                                    Modifier
+                                        .offset(x = slot * lensPosition)
+                                        .width(slot)
+                                        .fillMaxHeight()
+                                        .liquidGlass(RoundedCornerShape(25.dp), GlassDepth.TINTED, inst.glow),
+                                )
+                            }
+                            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                                items.forEachIndexed { index, screen ->
+                                    val selected = index == selectedIndex
+                                    val tint by animateColorAsState(
+                                        if (selected) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        label = "nav tint",
                                     )
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(25.dp))
+                                            .selectable(
+                                                selected = selected,
+                                                role = Role.Tab,
+                                                onClick = {
+                                                    navController.navigate(screen.route) {
+                                                        popUpTo(navController.graph.findStartDestination().id) {
+                                                            saveState = true
+                                                        }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                },
+                                            ),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                    ) {
+                                        Icon(
+                                            screen.icon,
+                                            contentDescription = null,
+                                            tint = tint,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                        Spacer(Modifier.height(3.dp))
+                                        Text(
+                                            screen.title,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = tint,
+                                            maxLines = 1,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        },
-    ) { innerPadding ->
-        NavHost(navController, startDestination = startDestination, Modifier.padding(innerPadding)) {
-            composable("home", context.resources.getString(R.string.setup)) {
-                SetupPage(subscriptions, navController, rootGranted)
-            }
-            // The old readiness overview is still reachable; Setup answers the
-            // narrower question most people open the app with.
-            composable("home/overview", context.resources.getString(R.string.home)) {
-                Home(navController)
-            }
-            composable("home/about", context.resources.getString(R.string.about)) {
-                About()
-            }
-            composable("home/how-to", context.resources.getString(R.string.how_to_use)) {
-                HowToUse()
-            }
-            composable("controls", context.resources.getString(R.string.controls)) {
-                ControlsHub(subscriptions, navController)
-            }
-            composable("network", context.resources.getString(R.string.network)) {
-                NetworkPage(subscriptions, navController)
-            }
-            // The deep diagnostics hub keeps its own route: the attach trace,
-            // physical channels and config diff are still reachable from Network.
-            composable("network/diagnostics", context.resources.getString(R.string.network_monitor)) {
-                MonitoringHub(subscriptions)
-            }
-            composable("field-test", context.resources.getString(R.string.field_test)) {
-                FieldTestPage(subscriptions)
-            }
-            composable("config/{subId}", context.resources.getString(R.string.sim_config)) { entry ->
-                entry.arguments?.getString("subId")?.toIntOrNull()?.let { Config(navController, it) }
-            }
-            composable("config/{subId}/dump", context.resources.getString(R.string.config_dump_viewer)) { entry ->
-                entry.arguments?.getString("subId")?.toIntOrNull()?.let { DumpedConfig(context, it) }
-            }
-            composable("config/{subId}/edit", context.resources.getString(R.string.expert_mode)) { entry ->
-                entry.arguments?.getString("subId")?.toIntOrNull()?.let { Editor(it) }
-            }
-            composable("bands/{subId}", context.resources.getString(R.string.bands)) { entry ->
-                entry.arguments?.getString("subId")?.toIntOrNull()?.let { Bands(it, navController, rootGranted) }
+            },
+        ) { innerPadding ->
+            // Tab pages scroll under the floating bar, which blurs them; other pages keep
+            // the plain bottom inset. The backdrop is painted inside the blur source too.
+            val barVisible = currentBackStackEntry?.destination?.route in BAR_ROUTES
+            val bottomInset = innerPadding.calculateBottomPadding()
+            Box(Modifier.fillMaxSize().hazeSource(hazeState).appBackdropPaint()) {
+                // Glass inside the blurred content falls back to its tinted body: an effect
+                // must not sample the layer it is drawn into.
+                CompositionLocalProvider(
+                    LocalBottomBarInset provides if (barVisible) bottomInset else 0.dp,
+                    LocalHazeState provides null,
+                ) {
+                    NavHost(
+                        navController,
+                        startDestination = startDestination,
+                        Modifier.padding(top = innerPadding.calculateTopPadding(), bottom = if (barVisible) 0.dp else bottomInset),
+                    ) {
+                        composable("home", context.resources.getString(R.string.setup)) {
+                            SetupPage(subscriptions, navController, rootGranted)
+                        }
+                        // The old readiness overview is still reachable; Setup answers the
+                        // narrower question most people open the app with.
+                        composable("home/overview", context.resources.getString(R.string.home)) {
+                            Home(navController)
+                        }
+                        composable("home/about", context.resources.getString(R.string.about)) {
+                            About()
+                        }
+                        composable("home/how-to", context.resources.getString(R.string.how_to_use)) {
+                            HowToUse()
+                        }
+                        composable("controls", context.resources.getString(R.string.controls)) {
+                            ControlsHub(subscriptions, navController)
+                        }
+                        composable("network", context.resources.getString(R.string.network)) {
+                            NetworkPage(subscriptions, navController)
+                        }
+                        // The deep diagnostics hub keeps its own route: the attach trace,
+                        // physical channels and config diff are still reachable from Network.
+                        composable("network/diagnostics", context.resources.getString(R.string.network_monitor)) {
+                            MonitoringHub(subscriptions)
+                        }
+                        composable("field-test", context.resources.getString(R.string.field_test)) {
+                            FieldTestPage(subscriptions)
+                        }
+                        composable("config/{subId}", context.resources.getString(R.string.sim_config)) { entry ->
+                            entry.arguments?.getString("subId")?.toIntOrNull()?.let { Config(navController, it) }
+                        }
+                        composable("config/{subId}/dump", context.resources.getString(R.string.config_dump_viewer)) { entry ->
+                            entry.arguments?.getString("subId")?.toIntOrNull()?.let { DumpedConfig(context, it) }
+                        }
+                        composable("config/{subId}/edit", context.resources.getString(R.string.expert_mode)) { entry ->
+                            entry.arguments?.getString("subId")?.toIntOrNull()?.let { Editor(it) }
+                        }
+                        composable("bands/{subId}", context.resources.getString(R.string.bands)) { entry ->
+                            entry.arguments?.getString("subId")?.toIntOrNull()?.let { Bands(it, navController, rootGranted) }
+                        }
+                    }
+                }
             }
         }
     }
 }
+
+/** Routes that show the floating tab bar. */
+private val BAR_ROUTES = setOf("home", "controls", "network", "field-test", "config/{subId}", "bands/{subId}")
 
 @Suppress("ktlint:standard:function-naming")
 @Preview
