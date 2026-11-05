@@ -81,6 +81,20 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import dev.bluehouse.enablevolte.components.NavBarState
+import dev.bluehouse.enablevolte.components.LocalNavBar
+import dev.bluehouse.enablevolte.components.IosNavBar
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.SignalCellularAlt
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
@@ -510,10 +524,10 @@ fun PixelIMSApp(
                 if (currentRoute in BAR_ROUTES) {
                     val currentDestination = currentBackStackEntry?.destination
                     val items = arrayListOf(
-                        Screen("home", stringResource(R.string.setup), Icons.Filled.Home),
-                        Screen("controls", stringResource(R.string.controls), Icons.Filled.Tune),
-                        Screen("network", stringResource(R.string.network), Icons.Filled.SignalCellularAlt),
-                        Screen("field-test", stringResource(R.string.field_test_short), Icons.Filled.Science),
+                        Screen("home", stringResource(R.string.setup), Icons.Rounded.Home),
+                        Screen("controls", stringResource(R.string.controls), Icons.Rounded.Tune),
+                        Screen("network", stringResource(R.string.network), Icons.Rounded.SignalCellularAlt),
+                        Screen("field-test", stringResource(R.string.field_test_short), Icons.Rounded.Science),
                     )
                     val inst = LocalInstrument.current
                     val barShape = RoundedCornerShape(30.dp)
@@ -547,7 +561,7 @@ fun PixelIMSApp(
                                         .width(slot)
                                         .fillMaxHeight()
                                         .clip(RoundedCornerShape(24.dp))
-                                        .background(accent.copy(alpha = if (inst.isDark) 0.16f else 0.12f)),
+                                        .background(if (inst.isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f)),
                                 )
                             }
                             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
@@ -592,7 +606,10 @@ fun PixelIMSApp(
             // Tab pages scroll under the floating bar, which blurs them; other pages keep
             // the plain bottom inset. The backdrop is painted inside the blur source too.
             val barVisible = currentBackStackEntry?.destination?.route in BAR_ROUTES
+            val onTab = currentBackStackEntry?.destination?.route in TAB_ROUTES
             val bottomInset = innerPadding.calculateBottomPadding()
+            val navBar = remember { NavBarState() }
+            Box(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().hazeSource(hazeState).appBackdropPaint()) {
                 // Glass inside the blurred content falls back to its tinted body: an effect
                 // must not sample the layer it is drawn into.
@@ -606,6 +623,7 @@ fun PixelIMSApp(
                 CompositionLocalProvider(
                     LocalBottomBarInset provides if (barVisible) bottomInset else 0.dp,
                     LocalHazeState provides null,
+                    LocalNavBar provides navBar,
                     LocalAppActions provides AppActions(
                         restoreAvailable = subscriptions.isNotEmpty(),
                         onRestore = { showRecoveryDialog = true },
@@ -615,10 +633,28 @@ fun PixelIMSApp(
                         onReload = { loadApplication() },
                     ),
                 ) {
+                    // Tab pages run under the status bar and the blurred navigation bar; deeper
+                    // pages push in from the right and pop back, as on iOS.
                     NavHost(
                         navController,
                         startDestination = startDestination,
-                        Modifier.padding(top = innerPadding.calculateTopPadding(), bottom = if (barVisible) 0.dp else bottomInset),
+                        Modifier.padding(top = if (onTab) 0.dp else innerPadding.calculateTopPadding(), bottom = if (barVisible) 0.dp else bottomInset),
+                        enterTransition = {
+                            if (targetState.destination.route in TAB_ROUTES && initialState.destination.route in TAB_ROUTES) {
+                                fadeIn(tween(160))
+                            } else {
+                                slideInHorizontally(IosPush) { it }
+                            }
+                        },
+                        exitTransition = {
+                            if (targetState.destination.route in TAB_ROUTES && initialState.destination.route in TAB_ROUTES) {
+                                fadeOut(tween(120))
+                            } else {
+                                slideOutHorizontally(IosPush) { -it / 3 } + fadeOut(IosPushFloat, targetAlpha = 0.6f)
+                            }
+                        },
+                        popEnterTransition = { slideInHorizontally(IosPush) { -it / 3 } + fadeIn(IosPushFloat, initialAlpha = 0.6f) },
+                        popExitTransition = { slideOutHorizontally(IosPush) { it } },
                     ) {
                         composable("home", context.resources.getString(R.string.setup)) {
                             SetupPage(subscriptions, navController, rootGranted)
@@ -663,9 +699,15 @@ fun PixelIMSApp(
                     }
                 }
             }
+            if (onTab) IosNavBar(navBar, hazeState)
+            }
         }
     }
 }
+
+/** The iOS push curve: fast start, long gentle settle. */
+private val IosPush = tween<IntOffset>(420, easing = CubicBezierEasing(0.2f, 0.9f, 0.25f, 1f))
+private val IosPushFloat = tween<Float>(420, easing = CubicBezierEasing(0.2f, 0.9f, 0.25f, 1f))
 
 /** The four tabs: they draw their own title row instead of a top bar. */
 private val TAB_ROUTES = setOf("home", "controls", "network", "field-test")

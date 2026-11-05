@@ -20,6 +20,16 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Analytics
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.CellTower
+import androidx.compose.material.icons.rounded.Insights
+import androidx.compose.ui.text.style.TextOverflow
+import dev.bluehouse.enablevolte.ui.theme.IosType
+import dev.bluehouse.enablevolte.components.IconRowDivider
+import dev.bluehouse.enablevolte.components.IosColors
+import dev.bluehouse.enablevolte.components.IconTile
 import androidx.compose.material.icons.filled.Insights
 import dev.bluehouse.enablevolte.components.IconDot
 import dev.bluehouse.enablevolte.components.GlassIconButton
@@ -264,16 +274,16 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
                 "Deep diagnostics",
                 subtitle = "Attach trace, physical channels, carrier settings",
                 onClick = { navController.navigate("network/diagnostics") },
-                leading = { IconDot(Icons.Filled.Insights, StatusTone.ACCENT) },
+                leading = { IconTile(Icons.Rounded.Insights, IosColors.indigo) },
             ) { Chevron() }
-            GroupDivider()
-            ListRow("Nearby and other measured cells", subtitle = "${ui.neighbours.size} cells, not part of this SIM's carriers", onClick = { sheet = nearbyListSheet(ui) }) { Chevron() }
-            GroupDivider()
-            ListRow("Connection history", subtitle = "${ui.events.size} changes this session", onClick = { sheet = historySheet(ui, vm::clearLog) }) { Chevron() }
-            GroupDivider()
-            ListRow("All measurements", subtitle = "Every value the modem reports", onClick = { sheet = allMeasurementsSheet(ui, name) }) { Chevron() }
-            GroupDivider()
-            ListRow("How to read the measurements", onClick = { sheet = guideSheet() }) { Chevron() }
+            IconRowDivider()
+            ListRow("Nearby and other measured cells", subtitle = "${ui.neighbours.size} cells, not part of this SIM's carriers", onClick = { sheet = nearbyListSheet(ui) }, leading = { IconTile(Icons.Rounded.CellTower, IosColors.teal) }) { Chevron() }
+            IconRowDivider()
+            ListRow("Connection history", subtitle = "${ui.events.size} changes this session", onClick = { sheet = historySheet(ui, vm::clearLog) }, leading = { IconTile(Icons.Rounded.History, IosColors.orange) }) { Chevron() }
+            IconRowDivider()
+            ListRow("All measurements", subtitle = "Every value the modem reports", onClick = { sheet = allMeasurementsSheet(ui, name) }, leading = { IconTile(Icons.Rounded.Analytics, IosColors.purple) }) { Chevron() }
+            IconRowDivider()
+            ListRow("How to read the measurements", onClick = { sheet = guideSheet() }, leading = { IconTile(Icons.Rounded.Info, IosColors.blue) }) { Chevron() }
         }
         if (ui.lastSampleAt > 0) Text("${if (ui.sampling && ui.available) "Updated" else "Last reading"} ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ui.lastSampleAt))} · ${ui.serviceState}", fontSize = 11.sp, color = muted, modifier = Modifier.padding(horizontal = 6.dp))
         PageEnd()
@@ -283,13 +293,22 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
         ModalBottomSheet(
             onDismissRequest = { sheet = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = if (inst.isDark) Color(0xF21C212A) else Color(0xF7FFFFFF),
-            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
-            dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 5.dp).background(muted.copy(alpha = 0.4f), CircleShape)) },
+            containerColor = MaterialTheme.colorScheme.background,
+            shape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp),
+            dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 5.dp).background(IosColors.tertiaryLabel, CircleShape)) },
         ) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(details.title, fontWeight = FontWeight.Bold, fontSize = 18.sp, lineHeight = 23.sp, modifier = Modifier.padding(horizontal = 4.dp))
-                Text(details.explanation, fontSize = 12.5.sp, lineHeight = 18.sp, color = muted, modifier = Modifier.padding(horizontal = 4.dp))
+                // iOS sheet header: centred title, bold "Done" on the right.
+                Box(Modifier.fillMaxWidth().height(44.dp)) {
+                    Text(details.title, style = IosType.Headline, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.Center).padding(horizontal = 64.dp))
+                    Text(
+                        "Done",
+                        style = IosType.Headline,
+                        color = accent,
+                        modifier = Modifier.align(Alignment.CenterEnd).clickable { sheet = null }.padding(vertical = 8.dp, horizontal = 4.dp),
+                    )
+                }
+                Text(details.explanation, style = IosType.Footnote, color = muted, modifier = Modifier.padding(horizontal = 16.dp))
                 if (details.readings.isNotEmpty()) {
                     GroupCard(Modifier.padding(top = 4.dp)) {
                         details.readings.forEachIndexed { index, reading ->
@@ -314,7 +333,6 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
                             sheet = null
                         }, danger = true, small = true)
                     }
-                    TonalPillButton("Done", { sheet = null }, small = true)
                 }
             }
         }

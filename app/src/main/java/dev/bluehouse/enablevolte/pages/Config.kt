@@ -31,6 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.rounded.SignalCellularAlt
+import dev.bluehouse.enablevolte.components.IosColors
+import dev.bluehouse.enablevolte.components.IconTile
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.Icons
 import dev.bluehouse.enablevolte.components.IconDot
@@ -294,7 +297,7 @@ fun Config(
                 bandsLabel,
                 subtitle = "Choose the LTE and 5G bands this SIM may use",
                 onClick = { navController.navigate("bands/$subId") },
-                leading = { IconDot(Icons.Filled.SignalCellularAlt, StatusTone.ACCENT) },
+                leading = { IconTile(Icons.Rounded.SignalCellularAlt, IosColors.green) },
             ) { Chevron() }
         }
 

@@ -22,6 +22,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Insights
+import androidx.compose.material.icons.rounded.SignalCellularAlt
+import androidx.compose.material.icons.rounded.Tune
+import dev.bluehouse.enablevolte.components.IconRowDivider
+import dev.bluehouse.enablevolte.components.IosColors
+import dev.bluehouse.enablevolte.components.IconTile
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.ui.text.font.FontWeight
@@ -200,7 +208,7 @@ internal fun HomeDashboard(
                     )
                 }
                 setupChecks.forEachIndexed { index, check ->
-                    if (index > 0 || ui.loading) GroupDivider()
+                    if (index > 0 || ui.loading) GroupDivider(inset = 53.dp)
                     HomeCheck(
                         check,
                         busy = ui.busyFix == check.fix && check.fix != FixAction.NONE,
@@ -216,38 +224,38 @@ internal fun HomeDashboard(
                 "Controls",
                 subtitle = "Carrier settings for a SIM",
                 onClick = { onNavigate("controls") },
-                leading = { IconDot(Icons.Filled.Tune, StatusTone.ACCENT) },
+                leading = { IconTile(Icons.Rounded.Tune, IosColors.gray) },
             ) { Chevron() }
             if (selectedId != null) {
-                GroupDivider()
+                IconRowDivider()
                 ListRow(
                     "Bands",
                     subtitle = "LTE and 5G bands for this SIM",
                     onClick = { onNavigate("bands/$selectedId") },
-                    leading = { IconDot(Icons.Filled.SignalCellularAlt, StatusTone.ACCENT) },
+                    leading = { IconTile(Icons.Rounded.SignalCellularAlt, IosColors.green) },
                 ) { Chevron() }
             }
-            GroupDivider()
+            IconRowDivider()
             ListRow(
                 "Deep diagnostics",
                 subtitle = "Attach trace, physical channels, carrier settings",
                 onClick = { onNavigate("network/diagnostics") },
-                leading = { IconDot(Icons.Filled.Insights, StatusTone.ACCENT) },
+                leading = { IconTile(Icons.Rounded.Insights, IosColors.indigo) },
             ) { Chevron() }
-            GroupDivider()
+            IconRowDivider()
             ListRow(
                 "How to use",
                 subtitle = "Setup, states, troubleshooting",
                 onClick = { onNavigate("home/how-to") },
-                leading = { IconDot(Icons.AutoMirrored.Filled.MenuBook, StatusTone.ACCENT) },
+                leading = { IconTile(Icons.AutoMirrored.Rounded.MenuBook, IosColors.blue) },
             ) { Chevron() }
             if (actions.restoreAvailable) {
-                GroupDivider()
+                IconRowDivider()
                 ListRow(
                     "Restore and reboot",
                     subtitle = "Undo applied changes",
                     onClick = actions.onRestore,
-                    leading = { IconDot(Icons.Filled.PowerSettingsNew, StatusTone.DANGER) },
+                    leading = { IconTile(Icons.Rounded.PowerSettingsNew, IosColors.red) },
                 ) { Chevron() }
             }
         }

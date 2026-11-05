@@ -3,6 +3,9 @@ package dev.bluehouse.enablevolte.ui.theme
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
@@ -74,7 +77,7 @@ private val DarkInstrument =
         scrim = ScrimDark,
         pools = listOf(PoolCyanDark, PoolVioletDark, PoolEmberDark),
         card = Hull,
-        hairline = Color(0x12FFFFFF),
+        hairline = Color(0x99545458),
         isDark = true,
     )
 
@@ -99,7 +102,7 @@ private val LightInstrument =
         scrim = ScrimLight,
         pools = listOf(PoolCyanLight, PoolVioletLight, PoolEmberLight),
         card = PaperHull,
-        hairline = Color(0x1410141A),
+        hairline = Color(0x4A3C3C43),
         isDark = false,
     )
 
@@ -162,7 +165,7 @@ private val LightColorScheme =
  * onto the page. Glass has thickness, and thickness has a radius.
  */
 /** Whole-UI scale so the concept reads at its intended size on a ~411 dp Pixel. */
-private const val UI_SCALE = 1.12f
+private const val UI_SCALE = 1.0f
 
 private val InstrumentShapes =
     Shapes(
@@ -173,6 +176,7 @@ private val InstrumentShapes =
         extraLarge = RoundedCornerShape(32.dp),
     )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun EnableVoLTETheme(
@@ -203,9 +207,8 @@ fun EnableVoLTETheme(
         }
     }
 
-    // The concept was laid out for a ~340 dp wide phone; Pixels are ~411 dp. Scaling the
-    // whole UI by 12% keeps the concept's proportions on a real screen, on top of the
-    // user's own font-size setting.
+    // iOS point sizes map almost one-to-one onto a ~411 dp Pixel, so no extra scale is
+    // applied (UI_SCALE = 1); the user's own font-size setting still applies.
     val base = LocalDensity.current
     val scaled = Density(base.density * UI_SCALE, base.fontScale)
     CompositionLocalProvider(LocalInstrument provides instrument, LocalDensity provides scaled) {
@@ -213,7 +216,13 @@ fun EnableVoLTETheme(
             colorScheme = colorScheme,
             typography = Typography,
             shapes = InstrumentShapes,
-            content = content,
-        )
+        ) {
+            // iOS tap feel everywhere: a grey highlight instead of Android's ripple.
+            CompositionLocalProvider(
+                LocalIndication provides IosHighlight(if (darkTheme) Color(0xFF3A3A3C).copy(alpha = 0.55f) else Color(0xFFD1D1D6).copy(alpha = 0.55f)),
+                LocalRippleConfiguration provides null,
+                content = content,
+            )
+        }
     }
 }
