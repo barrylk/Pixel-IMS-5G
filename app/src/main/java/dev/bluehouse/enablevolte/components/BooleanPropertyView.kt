@@ -63,7 +63,7 @@ fun BooleanPropertyView(
                 if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 } else {
-                    Switch(checked = toggled, enabled = localEnabled, onCheckedChange = onClick)
+                    ClearSwitch(checked = toggled, enabled = localEnabled, onCheckedChange = onClick)
                 }
             }
         }
@@ -85,7 +85,10 @@ private fun SubtitleText(
     busy: Boolean,
     error: String?,
 ) {
+    // The switch already shows plain yes/no; only custom labels, progress and errors need words.
+    val plain = trueLabel == stringResource(R.string.yes) && falseLabel == stringResource(R.string.no)
     when {
+        plain && !busy && error == null -> Unit
         busy ->
             Text(
                 text = stringResource(R.string.control_applying),

@@ -35,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -156,9 +157,13 @@ fun RegionalPatchCard(
                 }
             }
             if (phase != PatchPhase.CHECKING && !ui.busy) {
-                if (liquidStyle) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.size(8.dp).background(tone, CircleShape))
-                    Text(headline, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = tone)
+                if (liquidStyle) Row(
+                    Modifier.clip(CircleShape).background(tone.copy(alpha = 0.13f)).padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(Modifier.size(6.dp).background(tone, CircleShape))
+                    Text(headline, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = tone)
                 } else SignalChip(label = headline, tone = tone, dot = true)
             }
 
@@ -206,7 +211,7 @@ fun RegionalPatchCard(
                             onClick = { viewModel.requestConfirmation(RegionalPatchAction.INSTALL) },
                             enabled = !ui.busy,
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = CircleShape,
                             contentPadding = PaddingValues(vertical = 14.dp),
                         ) {
                             Text(
@@ -215,23 +220,21 @@ fun RegionalPatchCard(
                             )
                         }
                     ReadinessRules.canRevalidatePatch(status) ->
-                        OutlinedButton(
-                            onClick = { viewModel.requestConfirmation(RegionalPatchAction.INSTALL) },
+                        TonalPillButton(
+                            stringResource(R.string.reinstall_patch),
+                            { viewModel.requestConfirmation(RegionalPatchAction.INSTALL) },
+                            Modifier.fillMaxWidth(),
                             enabled = !ui.busy,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                        ) { Text(stringResource(R.string.reinstall_patch)) }
+                        )
                 }
                 if (ReadinessRules.canRemovePatch(status)) {
-                    TextButton(
-                        onClick = { viewModel.requestConfirmation(RegionalPatchAction.REMOVE) },
+                    TonalPillButton(
+                        stringResource(R.string.remove_patch),
+                        { viewModel.requestConfirmation(RegionalPatchAction.REMOVE) },
+                        Modifier.fillMaxWidth(),
                         enabled = !ui.busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Filled.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.remove_patch))
-                    }
+                        danger = true,
+                    )
                 }
             }
 

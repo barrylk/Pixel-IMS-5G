@@ -25,6 +25,7 @@ import android.telephony.CellIdentityNr
 import android.telephony.CellInfoLte
 import android.telephony.CellInfoNr
 import android.telephony.CellInfo
+import android.telephony.CellSignalStrengthLte
 import android.telephony.CellSignalStrengthNr
 import android.telephony.ICellInfoCallback
 import android.telephony.NetworkRegistrationInfo
@@ -653,7 +654,7 @@ class SubscriptionModer(
         )
         val dataInfo = registration?.dataSpecificInfo
         val servingIdentity = registration?.cellIdentity
-        val cellSnapshots = cells.mapNotNull { cell ->
+        val scannedSnapshots = cells.mapNotNull { cell ->
             when (cell) {
                 is CellInfoLte -> {
                     val identity = cell.cellIdentity
@@ -752,6 +753,28 @@ class SubscriptionModer(
             dataRat == "LTE" && nrState == 3 -> "5G NSA"
             dataRat == "LTE" && usingCarrierAggregation -> "LTE+"
             else -> dataRat
+        }
+        // The cell scan sometimes omits CQI, RSSI or timing advance for the serving LTE cell
+        // while Android's live signal report still has them; fill only those gaps from it.
+        val liveLte = runCatching {
+            context.getSystemService(TelephonyManager::class.java)
+                ?.createForSubscriptionId(subscriptionId)
+                ?.signalStrength
+                ?.getCellSignalStrengths(CellSignalStrengthLte::class.java)
+                ?.firstOrNull()
+        }.getOrNull()
+        val cellSnapshots = scannedSnapshots.map { snapshot ->
+            if (liveLte == null || snapshot.type != "LTE" || !snapshot.registered) {
+                snapshot
+            } else {
+                snapshot.copy(
+                    rssi = snapshot.rssi ?: liveLte.rssi.validSignalValue(),
+                    cqi = snapshot.cqi ?: liveLte.cqi.validSignalValue(),
+                    timingAdvance = snapshot.timingAdvance?.takeIf { it > 0 }
+                        ?: liveLte.timingAdvance.validSignalValue()?.takeIf { it > 0 }
+                        ?: snapshot.timingAdvance,
+                )
+            }
         }
         return RadioDiagnostics(
             lteBands = lteCells.flatMap {

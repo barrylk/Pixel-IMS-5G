@@ -21,10 +21,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
 import dev.bluehouse.enablevolte.ui.theme.NumericTextStyle
 
@@ -70,49 +72,39 @@ fun PremiumPageIntro(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = eyebrow.uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = eyebrow,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
         )
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall,
+            fontSize = 30.sp,
+            lineHeight = 34.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = (-0.7).sp,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
             text = description,
-            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
-/** A small state marker: a dot and a word, in the tone's colour. */
+/** A small state marker: one word in a soft pill of the tone's colour. */
 @Composable
 fun PremiumStatusChip(
     label: String,
     tone: StatusTone,
     modifier: Modifier = Modifier,
 ) {
-    val color = statusToneColor(tone)
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(6.dp),
-        color = color.copy(alpha = 0.10f),
-        contentColor = color,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Spacer(Modifier.size(6.dp).background(color, CircleShape))
-            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
-        }
-    }
+    StatusPill(label, tone, modifier)
 }
 
 /**
@@ -199,12 +191,7 @@ fun PremiumSectionLabel(
     text: String,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = text.uppercase(),
-        modifier = modifier.padding(start = 4.dp, top = 4.dp),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    GroupLabel(text, modifier)
 }
 
 /**

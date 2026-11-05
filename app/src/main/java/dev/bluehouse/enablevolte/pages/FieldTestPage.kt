@@ -38,7 +38,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import dev.bluehouse.enablevolte.components.BottomBarSpacer
+import dev.bluehouse.enablevolte.components.ClearSwitch
+import dev.bluehouse.enablevolte.components.ContentCard
+import dev.bluehouse.enablevolte.components.GroupCard
+import dev.bluehouse.enablevolte.components.GroupDivider
+import dev.bluehouse.enablevolte.components.GroupLabel
+import dev.bluehouse.enablevolte.components.HeroCard
+import dev.bluehouse.enablevolte.components.ListRow
+import dev.bluehouse.enablevolte.components.NoteBox
+import dev.bluehouse.enablevolte.components.PageTitle
+import dev.bluehouse.enablevolte.components.PrimaryPillButton
+import dev.bluehouse.enablevolte.components.SimPicker
+import dev.bluehouse.enablevolte.components.StatusPill
+import dev.bluehouse.enablevolte.components.TonalPillButton
+import dev.bluehouse.enablevolte.components.statusToneColor
 import dev.bluehouse.enablevolte.FieldTestReporter
 import dev.bluehouse.enablevolte.FieldTestResult
 import dev.bluehouse.enablevolte.MobileRadioIsolation
@@ -226,158 +244,114 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
     }
 
     Column(
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        PremiumPageIntro(
-            eyebrow = stringResource(R.string.premium_field_eyebrow),
-            title = stringResource(R.string.premium_field_title),
-            description = stringResource(R.string.premium_field_description),
+        PageTitle(stringResource(R.string.field_test_short))
+        SimPicker(
+            items = subscriptions.map { it.subscriptionId to it.uniqueName },
+            selectedId = selectedSubscription?.subscriptionId,
+            onSelect = { if (runningMode == null) selectedSubId = it },
+            enabled = runningMode == null,
         )
-        PremiumSectionLabel(stringResource(R.string.sim_detected))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            subscriptions.forEach { subscription ->
-                FilterChip(
-                    selected = selectedSubscription?.subscriptionId == subscription.subscriptionId,
-                    onClick = { if (runningMode == null) selectedSubId = subscription.subscriptionId },
-                    label = { Text(subscription.uniqueName) },
+
+        HeroCard(
+            title = stringResource(R.string.standard_field_test),
+            eyebrow = stringResource(R.string.premium_field_eyebrow),
+            body = stringResource(R.string.premium_field_description),
+        ) {
+            Text(
+                stringResource(R.string.field_test_privacy),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (runningMode == "standard") {
+                LinearProgressIndicator(
+                    progress = { progress.toFloat() / FieldTestReporter.SAMPLE_COUNT },
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                 )
             }
-        }
-
-        Panel(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Icon(Icons.Filled.Science, null, tint = MaterialTheme.colorScheme.primary)
-                        Text(stringResource(R.string.standard_field_test), style = MaterialTheme.typography.titleLarge)
-                    }
-                    PremiumStatusChip(stringResource(R.string.premium_safe), StatusTone.SUCCESS)
-                }
-                Text(
-                    stringResource(R.string.field_test_privacy),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (runningMode == "standard") {
-                    LinearProgressIndicator(
-                        progress = { progress.toFloat() / FieldTestReporter.SAMPLE_COUNT },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Button(
-                    enabled = selectedSubscription != null && runningMode == null,
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PrimaryPillButton(
+                    text = if (runningMode == "standard") {
+                        stringResource(R.string.field_test_progress, progress, FieldTestReporter.SAMPLE_COUNT)
+                    } else {
+                        stringResource(R.string.start_field_test)
+                    },
                     onClick = { start(aggressive = false) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        if (runningMode == "standard") {
-                            stringResource(R.string.field_test_progress, progress, FieldTestReporter.SAMPLE_COUNT)
-                        } else {
-                            stringResource(R.string.start_field_test)
-                        },
-                    )
-                }
+                    enabled = selectedSubscription != null && runningMode == null,
+                    modifier = Modifier.weight(1f),
+                )
+                StatusPill(stringResource(R.string.premium_safe), StatusTone.SUCCESS)
             }
         }
 
-        Panel(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                ) {
-                    Row(
+        GroupLabel(stringResource(R.string.aggressive_5g_test))
+        ContentCard {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.aggressive_5g_test),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                StatusPill(stringResource(R.string.premium_expert), StatusTone.WARNING)
+            }
+            Text(
+                stringResource(R.string.aggressive_5g_description),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (runningMode == "aggressive") {
+                LinearProgressIndicator(
+                    progress = { progress.toFloat() / FieldTestReporter.SAMPLE_COUNT },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    color = statusToneColor(StatusTone.WARNING),
+                )
+                Text(stringResource(R.string.field_test_progress, progress, FieldTestReporter.SAMPLE_COUNT), fontSize = 12.sp)
+                TonalPillButton(
+                    stringResource(R.string.stop_and_restore),
+                    { activeJob?.cancel() },
+                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    danger = true,
+                )
+            } else {
+                TonalPillButton(
+                    stringResource(R.string.start_aggressive_test),
+                    { confirmAggressive = true },
+                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    enabled = selectedSubscription != null && runningMode == null,
+                )
+            }
+            NoteBox(stringResource(R.string.aggressive_warning), StatusTone.DANGER, Modifier.padding(top = 4.dp))
+        }
+
+        status?.let { NoteBox(it, StatusTone.ACCENT) }
+        error?.let { NoteBox(it, StatusTone.DANGER) }
+        result?.let { report ->
+            GroupLabel(stringResource(R.string.field_test_complete))
+            ContentCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.field_test_saved, report.fileName),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Icon(Icons.Filled.Bolt, null, tint = MaterialTheme.colorScheme.tertiary)
-                        Text(
-                            stringResource(R.string.aggressive_5g_test),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.tertiary,
-                        )
-                    }
-                    PremiumStatusChip(stringResource(R.string.premium_expert), StatusTone.WARNING)
-                }
-                Text(
-                    stringResource(R.string.aggressive_5g_description),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (runningMode == "aggressive") {
-                    LinearProgressIndicator(
-                        progress = { progress.toFloat() / FieldTestReporter.SAMPLE_COUNT },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.tertiary,
                     )
-                    Button(
-                        onClick = { activeJob?.cancel() },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.stop_and_restore))
-                    }
-                    Text(stringResource(R.string.field_test_progress, progress, FieldTestReporter.SAMPLE_COUNT))
-                } else {
-                    Button(
-                        enabled = selectedSubscription != null && runningMode == null,
-                        onClick = { confirmAggressive = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.start_aggressive_test))
-                    }
+                    StatusPill(stringResource(R.string.field_test_complete), StatusTone.SUCCESS)
                 }
-                Text(
-                    stringResource(R.string.aggressive_warning),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
+                Text(report.summary, fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TonalPillButton(stringResource(R.string.share_field_test), { share(report) }, small = true)
             }
         }
 
         RadioLogCapturePanel()
-
-        if (status != null || error != null) {
-            Panel(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    PremiumStatusChip(
-                        label = if (error == null) {
-                            stringResource(R.string.premium_active)
-                        } else {
-                            stringResource(R.string.premium_attention)
-                        },
-                        tone = if (error == null) StatusTone.ACCENT else StatusTone.DANGER,
-                    )
-                    status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            }
-        }
-        result?.let { report ->
-            Panel(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PremiumStatusChip(stringResource(R.string.field_test_complete), StatusTone.SUCCESS)
-                    Text(
-                        stringResource(R.string.field_test_saved, report.fileName),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(report.summary, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
-                    OutlinedButton(onClick = { share(report) }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Share, contentDescription = null)
-                        Text(stringResource(R.string.share_field_test))
-                    }
-                }
-            }
-        }
         BottomBarSpacer()
     }
 }
@@ -453,146 +427,106 @@ private fun RadioLogCapturePanel() {
         )
     }
 
-    Panel(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Icon(Icons.Filled.Description, null, tint = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.radio_logs_title), style = MaterialTheme.typography.titleLarge)
-                }
-                PremiumStatusChip(stringResource(R.string.radio_logs_root_chip), StatusTone.ACCENT)
-            }
-            Text(
-                stringResource(R.string.radio_logs_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.radio_logs_redact), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.radio_logs_redact_summary),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    GroupLabel(stringResource(R.string.radio_logs_title) + " · " + stringResource(R.string.radio_logs_root_chip))
+    Text(
+        stringResource(R.string.radio_logs_description),
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 6.dp),
+    )
+    GroupCard {
+        ListRow(
+            title = stringResource(R.string.radio_logs_redact),
+            subtitle = stringResource(R.string.radio_logs_redact_summary),
+        ) {
+            ClearSwitch(checked = redact, enabled = !busy, onCheckedChange = { redact = it })
+        }
+        if (rootReady) {
+            GroupDivider()
+            ListRow(
+                title = stringResource(R.string.modem_logging_title),
+                subtitle = stringResource(R.string.modem_logging_summary, modemStatus?.directory?.ifBlank { null } ?: "/data/vendor/slog"),
+                below = {
+                    Spacer(Modifier.size(4.dp))
+                    StatusPill(
+                        stringResource(
+                            when (modemState) {
+                                null -> R.string.modem_logging_state_unknown
+                                RadioLogDigest.ModemLoggingState.UNSUPPORTED -> R.string.modem_logging_state_unsupported
+                                RadioLogDigest.ModemLoggingState.OFF -> R.string.modem_logging_state_off
+                                RadioLogDigest.ModemLoggingState.STARTING -> R.string.modem_logging_state_starting
+                                RadioLogDigest.ModemLoggingState.RUNNING -> R.string.modem_logging_state_running
+                                RadioLogDigest.ModemLoggingState.STOPPING -> R.string.modem_logging_state_stopping
+                            },
+                        ),
+                        when (modemState) {
+                            RadioLogDigest.ModemLoggingState.RUNNING -> StatusTone.SUCCESS
+                            RadioLogDigest.ModemLoggingState.STARTING, RadioLogDigest.ModemLoggingState.STOPPING -> StatusTone.WARNING
+                            else -> StatusTone.NEUTRAL
+                        },
+                        live = modemState == RadioLogDigest.ModemLoggingState.RUNNING,
                     )
-                }
-                Switch(checked = redact, enabled = !busy, onCheckedChange = { redact = it })
-            }
-            if (!redact) {
-                Text(
-                    stringResource(R.string.radio_logs_unredacted_warning),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            if (rootReady) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(stringResource(R.string.modem_logging_title), style = MaterialTheme.typography.titleMedium)
+                    modemStatus?.takeIf { modemSupported }?.let { status ->
                         Text(
-                            stringResource(R.string.modem_logging_summary, modemStatus?.directory?.ifBlank { null } ?: "/data/vendor/slog"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            stringResource(
-                                R.string.modem_logging_state,
-                                stringResource(
-                                    when (modemState) {
-                                        null -> R.string.modem_logging_state_unknown
-                                        RadioLogDigest.ModemLoggingState.UNSUPPORTED -> R.string.modem_logging_state_unsupported
-                                        RadioLogDigest.ModemLoggingState.OFF -> R.string.modem_logging_state_off
-                                        RadioLogDigest.ModemLoggingState.STARTING -> R.string.modem_logging_state_starting
-                                        RadioLogDigest.ModemLoggingState.RUNNING -> R.string.modem_logging_state_running
-                                        RadioLogDigest.ModemLoggingState.STOPPING -> R.string.modem_logging_state_stopping
-                                    },
-                                ),
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        modemStatus?.takeIf { modemSupported }?.let { status ->
-                            Text(
-                                stringResource(R.string.modem_logging_files, status.files, Formatter.formatShortFileSize(context, status.bytes)),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    Switch(
-                        checked = modemOn,
-                        enabled = modemSupported && !busy && !modemBusy,
-                        onCheckedChange = { want -> if (want) confirmModem = true else switchModemLogging(false) },
-                    )
-                }
-                if (modemBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                modemMessage?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.modem_logging_include), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(R.string.modem_logging_include_summary),
-                            style = MaterialTheme.typography.bodySmall,
+                            stringResource(R.string.modem_logging_files, status.files, Formatter.formatShortFileSize(context, status.bytes)),
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(
-                        checked = includeModem && modemSupported,
-                        enabled = modemSupported && !busy,
-                        onCheckedChange = { includeModem = it },
-                    )
-                }
-                if (includeModem && modemSupported) {
-                    Text(
-                        stringResource(R.string.modem_logging_include_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Button(
-                enabled = rootReady && !busy,
-                onClick = {
-                    busy = true
-                    captureError = null
-                    capture = null
-                    scope.launch {
-                        try {
-                            capture = RadioLogExport.capture(context, redact, includeModem && modemSupported)
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (failure: Throwable) {
-                            captureError = failure.message ?: failure.javaClass.simpleName
-                        } finally {
-                            busy = false
-                            modemStatus = runCatching { RadioLogExport.modemLoggingStatus() }.getOrNull() ?: modemStatus
-                        }
-                    }
+                    if (modemBusy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 4.dp))
+                    modemMessage?.let { Text(it, fontSize = 11.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 },
-                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(if (busy) R.string.radio_logs_capturing else R.string.radio_logs_capture))
-            }
-            if (!rootReady) {
-                Text(
-                    stringResource(R.string.radio_logs_root_only),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                ClearSwitch(
+                    checked = modemOn,
+                    enabled = modemSupported && !busy && !modemBusy,
+                    onCheckedChange = { want -> if (want) confirmModem = true else switchModemLogging(false) },
                 )
             }
-            captureError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            capture?.let { result ->
-                PremiumStatusChip(stringResource(R.string.field_test_complete), StatusTone.SUCCESS)
+            GroupDivider()
+            ListRow(
+                title = stringResource(R.string.modem_logging_include),
+                subtitle = stringResource(R.string.modem_logging_include_summary),
+            ) {
+                ClearSwitch(
+                    checked = includeModem && modemSupported,
+                    enabled = modemSupported && !busy,
+                    onCheckedChange = { includeModem = it },
+                )
+            }
+        }
+    }
+    if (!redact) NoteBox(stringResource(R.string.radio_logs_unredacted_warning), StatusTone.DANGER)
+    if (rootReady && includeModem && modemSupported) NoteBox(stringResource(R.string.modem_logging_include_warning), StatusTone.DANGER)
+    if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+    PrimaryPillButton(
+        text = stringResource(if (busy) R.string.radio_logs_capturing else R.string.radio_logs_capture),
+        onClick = {
+            busy = true
+            captureError = null
+            capture = null
+            scope.launch {
+                try {
+                    capture = RadioLogExport.capture(context, redact, includeModem && modemSupported)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Throwable) {
+                    captureError = failure.message ?: failure.javaClass.simpleName
+                } finally {
+                    busy = false
+                    modemStatus = runCatching { RadioLogExport.modemLoggingStatus() }.getOrNull() ?: modemStatus
+                }
+            }
+        },
+        enabled = rootReady && !busy,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (!rootReady) NoteBox(stringResource(R.string.radio_logs_root_only), StatusTone.NEUTRAL)
+    captureError?.let { NoteBox(it, StatusTone.DANGER) }
+    capture?.let { result ->
+        ContentCard {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(
                         R.string.radio_logs_saved,
@@ -600,80 +534,53 @@ private fun RadioLogCapturePanel() {
                         result.fileCount,
                         Formatter.formatShortFileSize(context, result.bytes),
                     ),
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
                 )
-                if (result.bootTime.isNotBlank()) {
-                    Text(
-                        stringResource(R.string.radio_logs_last_boot, result.bootTime),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (result.rilFiles == 0) {
-                    Text(
-                        stringResource(R.string.radio_logs_no_ril, result.rilDirectory),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Text(stringResource(R.string.radio_logs_endc_events), style = MaterialTheme.typography.titleSmall)
-                if (result.endcEvents.isEmpty()) {
-                    Text(
-                        stringResource(R.string.radio_logs_endc_none),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    result.endcEvents.takeLast(8).forEach {
-                        Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-                    }
-                }
-                if (result.uecap.isNotEmpty()) {
-                    Text(stringResource(R.string.radio_logs_uecap), style = MaterialTheme.typography.titleSmall)
-                    result.uecap.takeLast(4).forEach {
-                        Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-                    }
-                }
-                if (result.modemFiles > 0) {
-                    Text(
-                        stringResource(
-                            R.string.modem_logging_captured,
-                            result.modemFiles,
-                            Formatter.formatShortFileSize(context, result.modemBytes),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                if (modemOn) {
-                    Text(
-                        stringResource(R.string.modem_logging_turn_off_reminder),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                if (result.skipped > 0) {
-                    Text(
-                        stringResource(R.string.radio_logs_skipped, result.skipped),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedButton(
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "application/zip"
-                            putExtra(Intent.EXTRA_STREAM, result.uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.radio_logs_share)))
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Filled.Share, contentDescription = null)
-                    Text(stringResource(R.string.radio_logs_share))
+                StatusPill(stringResource(R.string.field_test_complete), StatusTone.SUCCESS)
+            }
+            if (result.bootTime.isNotBlank()) {
+                Text(stringResource(R.string.radio_logs_last_boot, result.bootTime), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (result.rilFiles == 0) NoteBox(stringResource(R.string.radio_logs_no_ril, result.rilDirectory), StatusTone.WARNING)
+            Text(stringResource(R.string.radio_logs_endc_events), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            if (result.endcEvents.isEmpty()) {
+                Text(stringResource(R.string.radio_logs_endc_none), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                result.endcEvents.takeLast(8).forEach {
+                    Text(it, fontSize = 10.5.sp, lineHeight = 15.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            if (result.uecap.isNotEmpty()) {
+                Text(stringResource(R.string.radio_logs_uecap), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                result.uecap.takeLast(4).forEach {
+                    Text(it, fontSize = 10.5.sp, lineHeight = 15.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (result.modemFiles > 0) {
+                NoteBox(
+                    stringResource(R.string.modem_logging_captured, result.modemFiles, Formatter.formatShortFileSize(context, result.modemBytes)),
+                    StatusTone.DANGER,
+                )
+            }
+            if (modemOn) NoteBox(stringResource(R.string.modem_logging_turn_off_reminder), StatusTone.WARNING)
+            if (result.skipped > 0) {
+                Text(stringResource(R.string.radio_logs_skipped, result.skipped), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TonalPillButton(
+                stringResource(R.string.radio_logs_share),
+                {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/zip"
+                        putExtra(Intent.EXTRA_STREAM, result.uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.radio_logs_share)))
+                },
+                small = true,
+            )
         }
     }
 }

@@ -8,6 +8,7 @@ import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +36,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import dev.bluehouse.enablevolte.components.ClearSwitch
+import dev.bluehouse.enablevolte.components.GroupCard
+import dev.bluehouse.enablevolte.components.GroupDivider
+import dev.bluehouse.enablevolte.components.GroupLabel
+import dev.bluehouse.enablevolte.components.ListRow
+import dev.bluehouse.enablevolte.components.NoteBox
+import dev.bluehouse.enablevolte.components.PageTitle
+import dev.bluehouse.enablevolte.components.PrimaryPillButton
+import dev.bluehouse.enablevolte.components.StatusTone
+import dev.bluehouse.enablevolte.components.TonalPillButton
 import dev.bluehouse.enablevolte.components.BottomBarSpacer
 import dev.bluehouse.enablevolte.BooleanControl
 import dev.bluehouse.enablevolte.ConfigControls
@@ -67,11 +78,11 @@ private fun SectionPanel(
     rows: List<@Composable () -> Unit>,
 ) {
     if (rows.isEmpty()) return
-    HeaderText(text = title)
-    PanelGroup {
+    GroupLabel(text = title, modifier = Modifier.padding(top = 8.dp))
+    GroupCard {
         rows.forEachIndexed { index, row ->
             if (index > 0) {
-                RowDivider()
+                GroupDivider()
             }
             row()
         }
@@ -83,6 +94,7 @@ private fun SectionPanel(
 fun Config(
     navController: NavController,
     subId: Int,
+    header: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val viewModel: ConfigViewModel =
@@ -150,6 +162,7 @@ fun Config(
     val radioWarning = stringResource(R.string.radio_warning)
     val spnLabel = stringResource(R.string.wi_fi_calling_carrier_name_format)
     val userAgentLabel = stringResource(R.string.user_agent)
+    val bandsLabel = stringResource(R.string.bands)
 
     val networkRows = listOfNotNull<@Composable () -> Unit>(
         {
@@ -171,6 +184,7 @@ fun Config(
             ) { viewModel.setRadioMode(it) }
         },
         { ClickablePropertyView(label = radioWarning, value = "") },
+        { ClickablePropertyView(label = bandsLabel, value = "") { navController.navigate("bands/$subId") } },
         toggleRow(stringResource(R.string.enable_enhanced_4g_lte_plus), ConfigControls.FOUR_G_PLUS),
         toggleRow(stringResource(R.string.allow_adding_apns), ConfigControls.ALLOW_ADDING_APNS),
     )
@@ -212,19 +226,16 @@ fun Config(
         toggleRow(stringResource(R.string.show_ims_status_in_sim_status), ConfigControls.SHOW_IMS_IN_SIM_INFO),
     )
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp).verticalScroll(scrollState)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(onClick = {}, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.sim_config))
-            }
-            OutlinedButton(onClick = { navController.navigate("bands/$subId") }, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.bands))
-            }
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp).verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (header != null) {
+            header()
+        } else {
+            PageTitle(stringResource(R.string.sim_config))
         }
-        Text(
+        NoteBox(
             text = stringResource(
                 if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
                     R.string.root_sim_config_persistence
@@ -232,25 +243,18 @@ fun Config(
                     R.string.shizuku_sim_config_persistence
                 },
             ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 12.dp),
+            tone = StatusTone.WARNING,
+            modifier = Modifier.padding(top = 6.dp),
         )
 
         if (PrivilegeManager.activeMode == PrivilegeMode.SHIZUKU) {
             var reapplyOnBoot by remember { mutableStateOf(ShizukuBootReapply.isEnabled(context)) }
-            Panel(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.shizuku_reapply_on_boot), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(R.string.shizuku_reapply_on_boot_summary),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
+            GroupCard(Modifier.padding(top = 6.dp)) {
+                ListRow(
+                    title = stringResource(R.string.shizuku_reapply_on_boot),
+                    subtitle = stringResource(R.string.shizuku_reapply_on_boot_summary),
+                ) {
+                    ClearSwitch(
                         checked = reapplyOnBoot,
                         onCheckedChange = {
                             reapplyOnBoot = it
@@ -261,11 +265,11 @@ fun Config(
             }
         }
 
-        SectionPanel(title = stringResource(R.string.config_section_network), rows = networkRows)
         SectionPanel(title = stringResource(R.string.config_section_calling), rows = callingRows)
+        SectionPanel(title = stringResource(R.string.config_section_network), rows = networkRows)
 
         if (PrivilegeManager.activeMode == PrivilegeMode.ROOT) {
-            HeaderText(text = stringResource(R.string.root_vowifi_repair_title))
+            GroupLabel(text = stringResource(R.string.root_vowifi_repair_title), modifier = Modifier.padding(top = 8.dp))
             RootVoWifiPanel(ui = ui, viewModel = viewModel)
         }
 
@@ -329,7 +333,7 @@ fun Config(
             ),
         )
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(20.dp))
         BottomBarSpacer()
     }
 }
@@ -398,18 +402,12 @@ private fun RootVoWifiPanel(
                 CircularProgressIndicator()
             } else {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { viewModel.applyRootVoWifiRepair() }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.root_vowifi_apply))
-                    }
-                    OutlinedButton(onClick = { viewModel.refreshRootVoWifi() }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.refresh))
-                    }
+                    PrimaryPillButton(stringResource(R.string.root_vowifi_apply), { viewModel.applyRootVoWifiRepair() }, Modifier.weight(1f))
+                    TonalPillButton(stringResource(R.string.refresh), { viewModel.refreshRootVoWifi() }, Modifier.weight(1f))
                 }
                 if (status?.snapshotAvailable == true) {
                     Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = { viewModel.restoreRootVoWifiRepair() }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.root_vowifi_restore))
-                    }
+                    TonalPillButton(stringResource(R.string.root_vowifi_restore), { viewModel.restoreRootVoWifiRepair() }, Modifier.fillMaxWidth())
                 }
             }
         }

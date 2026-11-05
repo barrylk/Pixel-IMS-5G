@@ -32,6 +32,24 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import dev.bluehouse.enablevolte.components.BottomBarSpacer
+import dev.bluehouse.enablevolte.components.BigReading
+import dev.bluehouse.enablevolte.components.Chevron
+import dev.bluehouse.enablevolte.components.ContentCard
+import dev.bluehouse.enablevolte.components.GroupCard
+import dev.bluehouse.enablevolte.components.GroupDivider
+import dev.bluehouse.enablevolte.components.GroupLabel
+import dev.bluehouse.enablevolte.components.HeroCard
+import dev.bluehouse.enablevolte.components.ListRow
+import dev.bluehouse.enablevolte.components.MeterBar
+import dev.bluehouse.enablevolte.components.NoteBox
+import dev.bluehouse.enablevolte.components.PageTitle
+import dev.bluehouse.enablevolte.components.ReadingCell
+import dev.bluehouse.enablevolte.components.RowValue
+import dev.bluehouse.enablevolte.components.SimPicker
+import dev.bluehouse.enablevolte.components.StatusPill
+import dev.bluehouse.enablevolte.components.StatusTone
+import dev.bluehouse.enablevolte.components.TonalPillButton
+import dev.bluehouse.enablevolte.components.statusToneColor
 import dev.bluehouse.enablevolte.components.floatingGlass
 import dev.bluehouse.enablevolte.components.calmSurface
 import dev.bluehouse.enablevolte.*
@@ -45,7 +63,7 @@ import java.util.Locale
 private data class Reading(val name: String, val value: String, val meaning: String)
 private data class ReadingSheet(val title: String, val explanation: String, val readings: List<Reading>, val raw: String? = null, val sourceKey: String? = null)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavController) {
     val context = LocalContext.current
@@ -93,129 +111,214 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
     val good = if (LocalInstrument.current.isDark) Color(0xFF52D99B) else Color(0xFF087B4F)
     val caution = if (LocalInstrument.current.isDark) Color(0xFFFFC466) else Color(0xFF8C5300)
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Live network", fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.8).sp, modifier = Modifier.weight(1f))
-            Row(Modifier.floatingGlass(RoundedCornerShape(24.dp)).clickable { userPaused = !userPaused; if (userPaused) vm.stop() else vm.start() }.padding(horizontal = 15.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+    var showNearby by rememberSaveable(sub.subscriptionId) { mutableStateOf(false) }
+    var showHistory by rememberSaveable(sub.subscriptionId) { mutableStateOf(false) }
+    var showGuide by rememberSaveable { mutableStateOf(false) }
+    val cell = ui.serving
+    val dbm = (cell?.rsrp ?: cell?.dbm)?.takeIf { it != Int.MAX_VALUE }
+    val clarity = cell?.sinr ?: cell?.csiSinr
+    val strengthTone = when { dbm == null -> StatusTone.NEUTRAL; dbm >= -95 -> StatusTone.SUCCESS; dbm >= -105 -> StatusTone.WARNING; else -> StatusTone.DANGER }
+    val clarityTone = when { clarity == null -> StatusTone.NEUTRAL; clarity >= 10 -> StatusTone.SUCCESS; clarity >= 0 -> StatusTone.WARNING; else -> StatusTone.DANGER }
+
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        PageTitle("Network") {
+            Row(
+                Modifier.floatingGlass(CircleShape).clickable { userPaused = !userPaused; if (userPaused) vm.stop() else vm.start() }.padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(Modifier.size(8.dp).background(if (ui.sampling && ui.available) good else caution, CircleShape))
-                Text(if (ui.sampling) "Live" else "Paused", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Text(if (ui.sampling) "Live" else "Paused", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-        Row(Modifier.fillMaxWidth().floatingGlass(RoundedCornerShape(28.dp)).horizontalScroll(rememberScrollState()).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            subscriptions.forEach { sim ->
-                val selected = sim.subscriptionId == sub.subscriptionId
-                val label = liveCarrierName(sim.carrierName.toString(), "${sim.mccString}${sim.mncString}", "SIM ${sim.simSlotIndex + 1}")
-                Box(Modifier.then(if (selected) Modifier.calmSurface(RoundedCornerShape(23.dp)) else Modifier).clickable { selectedId = sim.subscriptionId }.padding(horizontal = 16.dp, vertical = 13.dp)) {
-                    Text("$label · SIM ${sim.simSlotIndex + 1}", fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) accent else muted)
+        SimPicker(
+            items = subscriptions.map { sim ->
+                sim.subscriptionId to "${liveCarrierName(sim.carrierName.toString(), "${sim.mccString}${sim.mncString}", "SIM ${sim.simSlotIndex + 1}")} · SIM ${sim.simSlotIndex + 1}"
+            },
+            selectedId = sub.subscriptionId,
+            onSelect = { selectedId = it },
+        )
+        ui.message?.let { NoteBox(it, StatusTone.DANGER) }
+
+        val title = when {
+            !ui.available && !ui.loading -> "Readings unavailable"
+            radio?.serviceState == "Radio off" -> "Mobile radio is off"
+            radio?.serviceState in listOf("Out of service", "Emergency only") -> radio?.serviceState.orEmpty()
+            else -> connection?.title ?: "Reading your network…"
+        }
+        val plmn = radio?.operatorNumeric?.let { if (it.length >= 5) "${it.take(3)}-${it.drop(3)}" else it }.orEmpty()
+        val servingLine = cell?.let { "${if (it.type == "NR") "5G" else "LTE"} ${it.band} · channel ${radioReading(it.channel)}" }
+        val count = connection?.caBandwidth?.componentCount ?: 0
+        HeroCard(
+            title = title,
+            eyebrow = listOfNotNull(listOf(name, plmn).filter { it.isNotBlank() }.joinToString(" "), servingLine).joinToString(" · "),
+            body = if (!ui.sampling) "Paused. The values below are the last captured reading." else connection?.explanation ?: "Waiting for current radio information from your phone.",
+        ) {
+            FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                StatusPill(connection?.fiveGStatus ?: "5G state not reported", if (ui.nrAttached) StatusTone.SUCCESS else StatusTone.WARNING)
+                if (count > 1) {
+                    StatusPill("LTE CA · $count carriers", StatusTone.ACCENT)
+                } else if (connection?.caActive == true) {
+                    StatusPill("CA reported", StatusTone.ACCENT)
                 }
             }
+            Text("What does this mean?", color = accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { sheet = connectionSheet(ui) }.padding(top = 4.dp, bottom = 2.dp))
         }
-        ui.message?.let { LivePane { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) } }
-        LivePane {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Text(radio?.operatorNumeric?.let { if (it.length >= 5) "${it.take(3)}-${it.drop(3)}" else it }.orEmpty(), color = muted, fontSize = 12.sp)
+
+        ContentCard {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Signal", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("What does this mean?", color = accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { sheet = signalSheet(cell) })
             }
-            val title = when {
-                !ui.available && !ui.loading -> "Readings unavailable"
-                radio?.serviceState == "Radio off" -> "Mobile radio is off"
-                radio?.serviceState in listOf("Out of service", "Emergency only") -> radio?.serviceState.orEmpty()
-                else -> connection?.title ?: "Reading your network…"
-            }
-            Text(title, fontSize = 22.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.6).sp)
-            Text(if (!ui.sampling) "Paused. The values below are the last captured reading." else connection?.explanation ?: "Waiting for current radio information from your phone.", color = muted, fontSize = 14.sp, lineHeight = 20.sp)
-            HorizontalDivider(color = muted.copy(alpha = .13f), modifier = Modifier.padding(vertical = 3.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.size(8.dp).background(if (ui.nrAttached) good else caution, CircleShape))
-                Text(connection?.fiveGStatus ?: "5G state not reported", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-            Text("What does this mean?", color = accent, fontSize = 13.sp, modifier = Modifier.clickable { sheet = connectionSheet(ui) }.padding(vertical = 5.dp))
-        }
-        LivePane {
-            val bandwidth = connection?.caBandwidth
-            val count = bandwidth?.componentCount ?: 0
-            SectionTitle(when { count > 1 -> "Carrier aggregation · $count carriers"; connection?.caActive == true -> "CA reported · details incomplete"; else -> "LTE carrier report" })
-            Text(connection?.bandCombination?.takeIf { it.isNotBlank() } ?: "Bands not reported", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = accent)
-            Text(when { count > 1 -> "$count identified LTE carriers are reported together. The primary carrier handles the main connection; secondary carriers add capacity."; count == 1 -> "One LTE carrier is identified in this sample."; else -> "No LTE component details are available in this sample." }, fontSize = 12.sp, lineHeight = 17.sp, color = muted)
-            if (count > 0) Text(bandwidth!!.componentWidthsKhz.joinToString(" + ") { it?.let { width -> formatNumber(width / 1000.0) } ?: "?" } +
-                " MHz" + (bandwidth.totalKhz?.let { " = ${formatNumber(it / 1000.0)} MHz identified LTE bandwidth" } ?: " · total not reported"),
-                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
-            if (bandwidth != null && ui.lastSampleAt > 0) Text("${bandwidth.source} · ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ui.lastSampleAt))}", fontSize = 11.sp, color = muted)
-            Text(if (ui.nrAttached) connection?.explanation.orEmpty() else "5G: not connected. There is currently no active 5G link alongside these LTE carriers.", fontSize = 12.sp, lineHeight = 17.sp, color = muted)
-            if (connection?.caActive == true && count < 2) Text("Android's registration state reports CA, but extra components are not identified in this sample. Its bandwidth summary may be retained between radio updates; it is shown separately under Network registration.", fontSize = 12.sp, color = caution)
-        }
-        connection?.carriers?.forEachIndexed { index, carrier ->
-            LivePane {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${carrier.band} · ${carrier.rat}", fontSize = 21.sp, fontWeight = FontWeight.Bold, color = accent, modifier = Modifier.weight(1f))
-                    Text(when { carrier.rat == "NR" -> "5G"; carrier.role == "4G anchor" -> "LTE anchor"; carrier.role == "Extra 4G carrier" -> "SCC · secondary"; else -> "PCC · primary" }, fontSize = 12.sp, color = muted)
+            BigReading(dbm?.toString() ?: "—", if (dbm != null) "dBm RSRP" else "No reading")
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f).clickable { sheet = signalSheet(cell) }, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(Modifier.fillMaxWidth()) {
+                        Text("Strength", fontSize = 11.sp, color = muted, modifier = Modifier.weight(1f))
+                        Text(when { dbm == null -> "No reading"; dbm >= -95 -> "Good"; dbm >= -105 -> "Fair"; else -> "Weak" }, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = statusToneColor(strengthTone))
+                    }
+                    MeterBar(((dbm ?: -140) + 125) / 45f, statusToneColor(strengthTone))
                 }
-                Text(when { carrier.rat == "NR" -> "The 5G radio link. NSA uses this alongside the LTE anchor."; carrier.role == "4G anchor" -> "The 4G anchor keeps the NSA connection registered while 5G adds data capacity."; carrier.role == "Extra 4G carrier" -> "An additional LTE carrier combined with the primary carrier for data capacity."; else -> "The main LTE carrier handles registration and coordinates the other carriers." }, fontSize = 12.sp, lineHeight = 17.sp, color = muted)
-                ReadingGrid(carrierSheet(carrier).readings.distinctBy { it.name })
+                Column(Modifier.weight(1f).clickable { sheet = signalSheet(cell) }, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(Modifier.fillMaxWidth()) {
+                        Text("Clarity ${radioReading(clarity, "dB")}", fontSize = 11.sp, color = muted, modifier = Modifier.weight(1f))
+                        Text(when { clarity == null -> "No reading"; clarity >= 10 -> "Good"; clarity >= 0 -> "Fair"; else -> "Noisy" }, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = statusToneColor(clarityTone))
+                    }
+                    MeterBar(((clarity ?: -20) + 10) / 40f, statusToneColor(clarityTone))
+                }
             }
-        }
-        LivePane {
-            SectionTitle("Signal")
-            val cell = ui.serving
-            val dbm = (cell?.rsrp ?: cell?.dbm)?.takeIf { it != Int.MAX_VALUE }
-            val clarity = cell?.sinr ?: cell?.csiSinr
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(Modifier.weight(1f).clickable { sheet = signalSheet(cell) }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Strength", color = muted, fontSize = 13.sp)
-                    Text(radioReading(dbm, "dBm"), fontWeight = FontWeight.Bold, fontSize = if (dbm == null) 17.sp else 24.sp)
-                    val word = when { dbm == null -> "No reading"; dbm >= -95 -> "Good"; dbm >= -105 -> "Fair"; else -> "Weak" }
-                    Text(word, color = if (word == "Good") good else caution, fontSize = 13.sp)
-                }
-                Column(Modifier.weight(1f).clickable { sheet = signalSheet(cell) }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Clarity", color = muted, fontSize = 13.sp)
-                    Text(radioReading(clarity, "dB"), fontWeight = FontWeight.Bold, fontSize = if (clarity == null) 17.sp else 24.sp)
-                    Text(when { clarity == null -> "No reading"; clarity >= 10 -> "Good"; clarity >= 0 -> "Fair"; else -> "Noisy" }, color = if ((clarity ?: -1) >= 10) good else caution, fontSize = 13.sp)
-                }
+            val rssiCalculated = if (cell?.rssi == null && cell?.type == "LTE") RadioMath.estimateLteRssi(cell.rsrp, cell.rsrq, cell.bandwidthKhz) else null
+            val distance = cell?.let { RadioMath.distanceMetres(it.type, it.timingAdvance) }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ReadingCell(if (cell?.type == "NR") "SS-RSRQ" else "RSRQ", radioReading(cell?.rsrq, "dB"), Modifier.weight(1f))
+                ReadingCell("RSSI", cell?.rssi?.let { "$it dBm" } ?: rssiCalculated?.let { "≈$it dBm" } ?: "—", Modifier.weight(1f), note = if (cell?.rssi == null && rssiCalculated != null) "calculated" else null)
+                ReadingCell("CQI", cell?.cqi?.toString() ?: "—", Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ReadingCell("Timing adv.", cell?.timingAdvance?.let { "$it${if (cell.type == "NR") " µs" else ""}" } ?: "—", Modifier.weight(1f))
+                ReadingCell("Distance", distance?.let(RadioMath::formatDistance) ?: "—", Modifier.weight(1f), note = if (distance != null) "from timing advance" else null)
+                ReadingCell("PCI", radioReading(cell?.pci), Modifier.weight(1f))
             }
             if (ui.rsrpHistory.size > 1) {
-                Text("Recent strength · ${ui.rsrpHistory.size} samples", color = muted, fontSize = 11.sp)
-                Sparkline(ui.rsrpHistory, modifier = Modifier.fillMaxWidth().height(46.dp))
-                Text("Low ${radioReading(ui.historyMin)} · average ${radioReading(ui.historyMean)} · high ${radioReading(ui.historyMax)} dBm", color = muted, fontSize = 11.sp)
+                Sparkline(ui.rsrpHistory, modifier = Modifier.fillMaxWidth().padding(top = 6.dp).height(46.dp))
+                Text("Recent strength · ${ui.rsrpHistory.size} samples · low ${radioReading(ui.historyMin)} · average ${radioReading(ui.historyMean)} · high ${radioReading(ui.historyMax)} dBm", color = muted, fontSize = 11.sp, lineHeight = 15.sp)
             }
-            Text("Signal is not a speed test. Network load, bandwidth and carrier policy also affect performance.", color = muted, fontSize = 12.sp, lineHeight = 17.sp)
+            Text("Signal is not a speed test. Network load, bandwidth and carrier policy also affect performance. A value marked calculated is derived from reported readings, not reported by the modem.", color = muted, fontSize = 11.sp, lineHeight = 15.sp)
         }
-        LivePane {
-            SectionTitle("Network registration & IMS")
-            Text("Live service, calling and 5G registration details for this SIM.", fontSize = 12.sp, color = muted)
-            ReadingGrid(connectionSheet(ui).readings, explain = true)
-        }
-        LivePane {
-            SectionTitle("Nearby & other measured cells · ${ui.neighbours.size}")
-            Text("Measured cells without a confirmed role in this SIM's carrier combination. They are not counted as CA. Another SIM may also appear here.", fontSize = 12.sp, lineHeight = 17.sp, color = muted)
-            if (ui.neighbours.isEmpty()) Text("No other cells reported.", fontSize = 13.sp)
-        }
-        ui.neighbours.forEach { c ->
-            LivePane {
-                SectionTitle("${c.type} ${c.band} · PCI ${radioReading(c.pci)}")
-                Text("Measured cell · operator ${c.operator.ifBlank { "not reported" }}", fontSize = 12.sp, color = muted)
-                ReadingGrid(cellReadings(c))
+
+        val bandwidth = connection?.caBandwidth
+        GroupLabel(
+            when {
+                count > 1 -> "Active carriers · " + (bandwidth?.totalKhz?.let { "${formatNumber(it / 1000.0)} MHz reported" } ?: "$count carriers")
+                connection?.caActive == true -> "CA reported · details incomplete"
+                else -> "LTE carrier report"
+            },
+        )
+        val carriers = connection?.carriers.orEmpty()
+        val widest = carriers.mapNotNull { it.bandwidthKhz?.takeIf { w -> w > 0 && w != Int.MAX_VALUE } }.maxOrNull() ?: 0
+        GroupCard {
+            if (carriers.isEmpty()) ListRow("No LTE component details are available in this sample.")
+            carriers.forEachIndexed { index, carrier ->
+                if (index > 0) GroupDivider()
+                CarrierRow(carrier, widest) { sheet = carrierSheet(carrier) }
             }
         }
-        LivePane {
-            SectionTitle("How to read the measurements")
-            Text("RSRP: useful signal strength. Less negative is stronger.\nRSRQ: signal quality; less negative is usually better.\nSINR: signal clarity; higher is better.\nRSSI: total received power including noise.\nCQI: radio quality used to select coding, not a speed score.\nEARFCN / NR-ARFCN: the exact LTE / 5G channel.\nPCI: a reusable radio cell identity, not a unique tower ID.\nTAC: the tracking area used for mobility and paging.\nCell ID: the network's cell identifier. eNB / sector is derived from the LTE cell ID.\nBandwidth: radio spectrum width, not download speed.\nTiming advance: timing compensation, not an accurate tower distance.\nNot reported: the phone supplied no valid value; it does not mean zero.", fontSize = 12.sp, lineHeight = 20.sp, color = muted)
+        Text(
+            listOfNotNull(
+                connection?.bandCombination?.takeIf { it.isNotBlank() }?.let { "Bands $it." },
+                when {
+                    count > 1 -> "$count identified LTE carriers are reported together. The primary carrier handles the main connection; secondary carriers add capacity."
+                    count == 1 -> "One LTE carrier is identified in this sample."
+                    else -> null
+                },
+                if (count > 0 && bandwidth != null) {
+                    bandwidth.componentWidthsKhz.joinToString(" + ") { it?.let { width -> formatNumber(width / 1000.0) } ?: "?" } + " MHz" +
+                        (bandwidth.totalKhz?.let { " = ${formatNumber(it / 1000.0)} MHz identified LTE bandwidth." } ?: " · total not reported.")
+                } else {
+                    null
+                },
+                if (bandwidth != null && ui.lastSampleAt > 0) "${bandwidth.source} · ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ui.lastSampleAt))}." else null,
+                if (ui.nrAttached) connection?.explanation else "5G: not connected. There is currently no active 5G link alongside these LTE carriers.",
+            ).joinToString(" "),
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+            color = muted,
+            modifier = Modifier.padding(horizontal = 6.dp),
+        )
+        if (connection?.caActive == true && count < 2) {
+            NoteBox("Android's registration state reports CA, but extra components are not identified in this sample. Its bandwidth summary may be retained between radio updates; it is shown under All registration details.", StatusTone.WARNING)
         }
-        LivePane {
-            SectionTitle("Connection history · ${ui.events.size}")
-            if (ui.events.isEmpty()) Text("No changes recorded in this session.", fontSize = 13.sp)
-            ui.events.take(30).forEach { event ->
-                Text("${event.clock} · ${event.title}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Text(event.detail, fontSize = 12.sp, color = muted)
+
+        GroupLabel("Registration and IMS")
+        GroupCard {
+            ListRow("Data") { RowValue("${radio?.dataRat ?: "Not reported"} · ${ui.serviceState.ifBlank { "Not reported" }}") }
+            GroupDivider()
+            ListRow("Calling (IMS)") {
+                StatusPill(
+                    if (radio?.imsRegistered == true) "Registered · ${radio.imsTransport}" else "Not registered",
+                    if (radio?.imsRegistered == true) StatusTone.SUCCESS else StatusTone.NEUTRAL,
+                )
             }
-            TextButton(onClick = vm::clearLog) { Text("Clear history") }
+            GroupDivider()
+            ListRow("NR advertised") { RowValue(flag(radio?.nrAvailable)) }
+            GroupDivider()
+            ListRow("EN-DC available") { RowValue(flag(radio?.endcAvailable)) }
+            GroupDivider()
+            ListRow("NR state") {
+                StatusPill(
+                    when (radio?.nrState) { 0 -> "None"; 1 -> "Restricted"; 2 -> "Not connected"; 3 -> "Connected"; else -> "Not reported" },
+                    when (radio?.nrState) { 3 -> StatusTone.SUCCESS; 1, 2 -> StatusTone.WARNING; else -> StatusTone.NEUTRAL },
+                )
+            }
+            GroupDivider()
+            ListRow("All registration details", subtitle = "Every value Android reports for this SIM, with explanations", onClick = { sheet = connectionSheet(ui) }) { Chevron() }
         }
-        Disclosure("Deep diagnostics", "Attach trace, physical channels and carrier settings") { navController.navigate("network/diagnostics") }
-        if (ui.lastSampleAt > 0) Text("${if (ui.sampling && ui.available) "Updated" else "Last reading"} ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ui.lastSampleAt))} · ${ui.serviceState}", fontSize = 11.sp, color = muted, modifier = Modifier.padding(horizontal = 4.dp))
-        Spacer(Modifier.height(18.dp))
+
+        GroupCard {
+            ListRow("Nearby and other measured cells", subtitle = "${ui.neighbours.size} cells, not part of this SIM's carriers. Another SIM may also appear here.", onClick = { showNearby = !showNearby }) { ExpandMark(showNearby) }
+            if (showNearby) {
+                if (ui.neighbours.isEmpty()) ListRow("No other cells reported.")
+                ui.neighbours.forEach { c ->
+                    GroupDivider()
+                    ListRow(
+                        "${c.type} ${c.band} · PCI ${radioReading(c.pci)}",
+                        subtitle = "RSRP ${radioReading(c.rsrp, "dBm")} · channel ${radioReading(c.channel)} · operator ${c.operator.ifBlank { "not reported" }}",
+                        onClick = { sheet = nearbySheet(c) },
+                    ) { Chevron() }
+                }
+            }
+            GroupDivider()
+            ListRow("Connection history", subtitle = "${ui.events.size} changes this session", onClick = { showHistory = !showHistory }) { ExpandMark(showHistory) }
+            if (showHistory) {
+                if (ui.events.isEmpty()) ListRow("No changes recorded in this session.")
+                ui.events.take(30).forEach { event ->
+                    GroupDivider()
+                    ListRow("${event.clock} · ${event.title}", subtitle = event.detail)
+                }
+                if (ui.events.isNotEmpty()) TonalPillButton("Clear history", vm::clearLog, Modifier.padding(start = 16.dp, bottom = 10.dp), small = true)
+            }
+            GroupDivider()
+            ListRow("All measurements", subtitle = "Every value the modem reports for this SIM", onClick = { sheet = allMeasurementsSheet(ui, name) }) { Chevron() }
+            GroupDivider()
+            ListRow("Deep diagnostics", subtitle = "Attach trace, physical channels and carrier settings", onClick = { navController.navigate("network/diagnostics") }) { Chevron() }
+            GroupDivider()
+            ListRow("How to read the measurements", onClick = { showGuide = !showGuide }) { ExpandMark(showGuide) }
+            if (showGuide) {
+                Text(
+                    "RSRP: useful signal strength. Less negative is stronger.\nRSRQ: signal quality; less negative is usually better.\nSINR: signal clarity; higher is better.\nRSSI: total received power including noise. When the modem omits it, it is calculated from RSRP, RSRQ and the channel width, and marked calculated.\nCQI: radio quality used to select coding, not a speed score.\nEARFCN / NR-ARFCN: the exact LTE / 5G channel.\nPCI: a reusable radio cell identity, not a unique tower ID.\nTAC: the tracking area used for mobility and paging.\nCell ID: the network's cell identifier. eNB / sector is derived from the LTE cell ID.\nBandwidth: radio spectrum width, not download speed.\nTiming advance: timing compensation. Distance is estimated from it (about 78 m per LTE step) and is approximate.\nNot reported: the phone supplied no valid value; it does not mean zero.",
+                    fontSize = 12.sp,
+                    lineHeight = 19.sp,
+                    color = muted,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
+                )
+            }
+        }
+        if (ui.lastSampleAt > 0) Text("${if (ui.sampling && ui.available) "Updated" else "Last reading"} ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ui.lastSampleAt))} · ${ui.serviceState}", fontSize = 11.sp, color = muted, modifier = Modifier.padding(horizontal = 6.dp))
+        Spacer(Modifier.height(8.dp))
         BottomBarSpacer()
     }
     sheet?.let { details ->
-        ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = LocalInstrument.current.card) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(details.title, fontWeight = FontWeight.Bold, fontSize = 25.sp)
                 Text(details.explanation, fontSize = 14.sp, lineHeight = 20.sp, color = muted)
@@ -241,32 +344,28 @@ fun NetworkPage(subscriptions: List<SubscriptionInfo>, navController: NavControl
     }
 }
 
-@Composable private fun SectionTitle(title: String, modifier: Modifier = Modifier) {
-    Text(title, modifier = modifier, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, letterSpacing = (-.3).sp)
+@Composable private fun ExpandMark(expanded: Boolean) {
+    Text(if (expanded) "Hide" else "Show", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
 }
-@Composable private fun ReadingGrid(readings: List<Reading>, explain: Boolean = false) {
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+
+/** One active carrier: role chip, band, width bar and width, opening its readings. */
+@Composable private fun CarrierRow(carrier: LiveCarrier, widestKhz: Int, onClick: () -> Unit) {
     val accent = MaterialTheme.colorScheme.primary
-    readings.chunked(2).forEach { pair ->
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            pair.forEach { reading ->
-                Column(Modifier.weight(1f).background(accent.copy(alpha = .055f), RoundedCornerShape(12.dp)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(reading.name, fontSize = 11.sp, lineHeight = 15.sp, color = muted)
-                    Text(reading.value, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
-                    if (explain) Text(reading.meaning, fontSize = 11.sp, lineHeight = 15.sp, color = muted)
-                }
-            }
-            if (pair.size == 1) Spacer(Modifier.weight(1f))
+    val primary = carrier.rat == "NR" || carrier.role !in listOf("Extra 4G carrier")
+    val width = carrier.bandwidthKhz?.takeIf { it > 0 && it != Int.MAX_VALUE }
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            when { carrier.rat == "NR" -> "5G"; carrier.role == "4G anchor" -> "Anchor"; carrier.role == "Extra 4G carrier" -> "SCC"; else -> "PCC" },
+            fontSize = 10.sp, fontWeight = FontWeight.ExtraBold,
+            color = if (primary) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.background(if (primary) accent.copy(alpha = .13f) else LocalInstrument.current.hairline, RoundedCornerShape(7.dp)).padding(horizontal = 7.dp, vertical = 3.dp),
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("${carrier.band} · ${carrier.rat}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            MeterBar(if (width != null && widestKhz > 0) width.toFloat() / widestKhz else 0f, accent)
         }
-    }
-}
-@Composable private fun Disclosure(title: String, subtitle: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().calmSurface(RoundedCornerShape(23.dp)).clickable(onClick = onClick).padding(horizontal = 17.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp)
-        }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+        Text(width?.let { "${formatNumber(it / 1000.0)} MHz" } ?: "—", fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        Chevron()
     }
 }
 private fun formatNumber(value: Double) = if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.US, "%.2f", value)
@@ -322,7 +421,8 @@ private fun cellReadings(c: SubscriptionModer.CellSnapshot): List<Reading> = bui
     add(Reading("RSRP / SS-RSRP", radioReading(c.rsrp, "dBm"), "Reference-signal strength. Less negative is stronger; −90 dBm is stronger than −110 dBm."))
     add(Reading("RSRQ / SS-RSRQ", radioReading(c.rsrq, "dB"), "Reference-signal quality, influenced by interference and loading. Less negative is generally better."))
     add(Reading("SINR / SS-SINR", radioReading(c.sinr, "dB"), "Useful signal compared with interference and noise. Higher is clearer."))
-    add(Reading("RSSI", radioReading(c.rssi, "dBm"), "Total received power, including interference; different from reference-signal strength."))
+    val rssiCalculated = if (c.rssi == null && c.type == "LTE") RadioMath.estimateLteRssi(c.rsrp, c.rsrq, c.bandwidthKhz) else null
+    add(Reading("RSSI", c.rssi?.let { "$it dBm" } ?: rssiCalculated?.let { "≈$it dBm (calculated)" } ?: "Not reported", "Total received power, including interference; different from reference-signal strength. When the modem omits it, it is calculated as RSRP + 10·log10(resource blocks) − RSRQ."))
     add(Reading("CQI", radioReading(c.cqi), "Channel Quality Indicator helps the network select modulation and coding; not a speed measurement."))
     add(Reading("Signal level", radioReading(c.level, "/ 4"), "Android's coarse signal level. The detailed measurements provide more context."))
     add(Reading("Channel", radioReading(c.channel), "EARFCN for LTE or NR-ARFCN for 5G identifies the radio channel."))
@@ -335,6 +435,7 @@ private fun cellReadings(c: SubscriptionModer.CellSnapshot): List<Reading> = bui
     }
     add(Reading("Bandwidth", c.bandwidthKhz?.let { "${formatNumber(it / 1000.0)} MHz" } ?: "Not reported", "Width of this carrier. CA can combine several separate widths."))
     add(Reading("Timing advance", radioReading(c.timingAdvance, if (c.type == "NR") "µs" else "steps"), "Radio timing compensation; not a reliable direct distance to the tower."))
+    add(Reading("Distance to cell (estimate)", RadioMath.distanceMetres(c.type, c.timingAdvance)?.let(RadioMath::formatDistance) ?: "Not reported", "Estimated from timing advance: about 78 m per LTE step, or 150 m per microsecond for 5G. Approximate; reflections and network rounding affect it. Zero means not measured."))
     add(Reading("Reported bands", c.allBands.takeUnless { it == "[]" || it.isBlank() } ?: "Not reported", "Bands for this measured cell; this list alone does not prove multiple CA carriers."))
     add(Reading("Connection role", when(c.connectionStatus) { 1 -> "Primary serving"; 2 -> "Secondary serving"; 0 -> "Not serving"; else -> "Not reported" }, "Primary handles signaling and possibly data; secondary supports data. Nearby cells are not automatically serving cells."))
     if (c.type == "NR") {
