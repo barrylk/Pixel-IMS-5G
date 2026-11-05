@@ -22,35 +22,23 @@ import dev.bluehouse.enablevolte.R
 fun ClickablePropertyView(
     label: String,
     value: String?,
-    labelFontSize: TextUnit = 18.sp,
-    valueFontSize: TextUnit = 14.sp,
-    labelFontFamily: FontFamily? = null,
+    @Suppress("UNUSED_PARAMETER") labelFontSize: TextUnit = 18.sp,
+    @Suppress("UNUSED_PARAMETER") valueFontSize: TextUnit = 14.sp,
+    @Suppress("UNUSED_PARAMETER") labelFontFamily: FontFamily? = null,
     valueFontFamily: FontFamily? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    if (value == null) {
-        CompactPropertySurface(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
-                Text(text = label, style = MaterialTheme.typography.titleMedium)
-                Text(text = stringResource(R.string.unknown), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        return
-    }
-    if (onClick != null) {
-        CompactPropertySurface(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
-                Text(text = label, modifier = Modifier.padding(bottom = 2.dp), style = MaterialTheme.typography.titleMedium, fontFamily = labelFontFamily)
-                Text(text = value, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, fontFamily = valueFontFamily)
-            }
-        }
-    } else {
-        CompactPropertySurface(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
-                Text(text = label, modifier = Modifier.padding(bottom = 2.dp), style = MaterialTheme.typography.titleMedium, fontFamily = labelFontFamily)
-                Text(text = value, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, fontFamily = valueFontFamily)
-            }
-        }
+    // The Clear Glass row: a short value sits on the right before the chevron, a long
+    // one goes under the title so it never squeezes the label.
+    val shown = value ?: stringResource(R.string.unknown)
+    val short = shown.length <= 22 && valueFontFamily == null
+    ListRow(
+        title = label,
+        subtitle = if (short) null else shown,
+        onClick = onClick,
+    ) {
+        if (short && shown.isNotBlank()) RowValue(shown)
+        if (onClick != null) Chevron()
     }
 }
 

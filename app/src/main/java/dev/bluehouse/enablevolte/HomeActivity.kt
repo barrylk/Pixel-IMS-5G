@@ -81,6 +81,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.statusBarsPadding
+import dev.bluehouse.enablevolte.components.LocalAppActions
+import dev.bluehouse.enablevolte.components.GlassIconButton
+import dev.bluehouse.enablevolte.components.AppActions
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -475,97 +482,28 @@ fun PixelIMSApp(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                TopAppBar(
-                    title = {
-                        val route = currentBackStackEntry?.destination?.route
-                        if (route in setOf("home", "controls", "network", "field-test")) {
-                            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                                Text(
-                                    stringResource(R.string.app_name),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                Text(
-                                    stringResource(R.string.app_signature),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontStyle = FontStyle.Italic,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        } else {
-                            Text(
-                                currentBackStackEntry?.destination?.label?.toString()
-                                    ?: stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    navigationIcon = {
+                // Tab pages carry their own large title and round glass buttons, as in the
+                // concept; only deeper pages get a bar, with a glass back button.
+                val route = currentBackStackEntry?.destination?.route
+                if (route !in TAB_ROUTES) {
+                    Row(
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         if (currentBackStackEntry?.destination?.depth?.let { it > 1 } == true) {
-                            IconButton(onClick = {
-                                navController.popBackStack()
-                            }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Go back",
-                                )
-                            }
+                            GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Go back", { navController.popBackStack() })
                         }
-                    },
-                    actions = {
-                        // The top-bar buttons float in one glass capsule.
-                        Row(
-                            Modifier.padding(end = 10.dp).floatingGlass(RoundedCornerShape(26.dp)).padding(horizontal = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            IconButton(onClick = { onThemeModeChange(themeMode.next()) }) {
-                                Icon(
-                                    when (themeMode) {
-                                        ThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
-                                        ThemeMode.LIGHT -> Icons.Filled.LightMode
-                                        ThemeMode.DARK -> Icons.Filled.DarkMode
-                                    },
-                                    contentDescription = stringResource(
-                                        when (themeMode) {
-                                            ThemeMode.SYSTEM -> R.string.appearance_system
-                                            ThemeMode.LIGHT -> R.string.appearance_light
-                                            ThemeMode.DARK -> R.string.appearance_dark
-                                        },
-                                    ),
-                                )
-                            }
-                            if (subscriptions.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { showRecoveryDialog = true },
-                                ) {
-                                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = stringResource(R.string.restore_and_reboot))
-                                }
-                            }
-                            if (currentBackStackEntry?.destination?.route != "home/about") {
-                                IconButton(
-                                    onClick = { navController.navigate("home/about") },
-                                ) {
-                                    Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.about))
-                                }
-                            }
-                            if (currentBackStackEntry?.destination?.route == "home") {
-                                IconButton(onClick = {
-                                    loadApplication()
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Refresh,
-                                        contentDescription = "Refresh contents",
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = LocalInstrument.current.scrim,
-                    ),
-                )
+                        Text(
+                            currentBackStackEntry?.destination?.label?.toString() ?: stringResource(R.string.app_name),
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             },
             bottomBar = {
                 val currentRoute = currentBackStackEntry?.destination?.route
@@ -590,15 +528,16 @@ fun PixelIMSApp(
                         animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
                         label = "nav lens",
                     )
-                    // A floating pane of thick glass, with a smaller lens of tinted
-                    // glass that slides between tabs rather than jumping.
-                    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 10.dp)) {
+                    // The floating glass tab bar from the concept: the chosen tab sits in a
+                    // soft accent pill that slides between tabs.
+                    val accent = MaterialTheme.colorScheme.primary
+                    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 6.dp)) {
                         BoxWithConstraints(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(66.dp)
+                                .height(62.dp)
                                 .floatingGlass(barShape)
-                                .padding(5.dp),
+                                .padding(6.dp),
                         ) {
                             val slot = maxWidth / items.size
                             if (selectedIndex >= 0) {
@@ -607,25 +546,22 @@ fun PixelIMSApp(
                                         .offset(x = slot * lensPosition)
                                         .width(slot)
                                         .fillMaxHeight()
-                                        .liquidGlass(RoundedCornerShape(25.dp), GlassDepth.TINTED, inst.glow),
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(accent.copy(alpha = if (inst.isDark) 0.16f else 0.12f)),
                                 )
                             }
                             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                                 items.forEachIndexed { index, screen ->
                                     val selected = index == selectedIndex
                                     val tint by animateColorAsState(
-                                        if (selected) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
+                                        if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
                                         label = "nav tint",
                                     )
                                     Column(
                                         modifier = Modifier
                                             .weight(1f)
                                             .fillMaxHeight()
-                                            .clip(RoundedCornerShape(25.dp))
+                                            .clip(RoundedCornerShape(24.dp))
                                             .selectable(
                                                 selected = selected,
                                                 role = Role.Tab,
@@ -642,19 +578,9 @@ fun PixelIMSApp(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center,
                                     ) {
-                                        Icon(
-                                            screen.icon,
-                                            contentDescription = null,
-                                            tint = tint,
-                                            modifier = Modifier.size(22.dp),
-                                        )
-                                        Spacer(Modifier.height(3.dp))
-                                        Text(
-                                            screen.title,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = tint,
-                                            maxLines = 1,
-                                        )
+                                        Icon(screen.icon, contentDescription = null, tint = tint, modifier = Modifier.size(21.dp))
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(screen.title, fontSize = 10.5.sp, lineHeight = 13.sp, fontWeight = FontWeight.SemiBold, color = tint, maxLines = 1)
                                     }
                                 }
                             }
@@ -670,9 +596,24 @@ fun PixelIMSApp(
             Box(Modifier.fillMaxSize().hazeSource(hazeState).appBackdropPaint()) {
                 // Glass inside the blurred content falls back to its tinted body: an effect
                 // must not sample the layer it is drawn into.
+                val appearanceLabel = stringResource(
+                    when (themeMode) {
+                        ThemeMode.SYSTEM -> R.string.appearance_system
+                        ThemeMode.LIGHT -> R.string.appearance_light
+                        ThemeMode.DARK -> R.string.appearance_dark
+                    },
+                )
                 CompositionLocalProvider(
                     LocalBottomBarInset provides if (barVisible) bottomInset else 0.dp,
                     LocalHazeState provides null,
+                    LocalAppActions provides AppActions(
+                        restoreAvailable = subscriptions.isNotEmpty(),
+                        onRestore = { showRecoveryDialog = true },
+                        appearanceLabel = appearanceLabel,
+                        onCycleAppearance = { onThemeModeChange(themeMode.next()) },
+                        onAbout = { navController.navigate("home/about") },
+                        onReload = { loadApplication() },
+                    ),
                 ) {
                     NavHost(
                         navController,
@@ -725,6 +666,9 @@ fun PixelIMSApp(
         }
     }
 }
+
+/** The four tabs: they draw their own title row instead of a top bar. */
+private val TAB_ROUTES = setOf("home", "controls", "network", "field-test")
 
 /** Routes that show the floating tab bar. */
 private val BAR_ROUTES = setOf("home", "controls", "network", "field-test", "config/{subId}", "bands/{subId}")

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.bluehouse.enablevolte.R
 
 /**
@@ -43,36 +44,18 @@ fun BooleanPropertyView(
     onClick: ((Boolean) -> Unit)? = null,
 ) {
     val localEnabled = enabled && Build.VERSION.SDK_INT >= minSdk && !busy
-
     if (toggled == null) {
-        CompactPropertySurface(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
-                Text(text = label, style = MaterialTheme.typography.titleMedium)
-                Text(text = stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall, color = statusToneColor(StatusTone.WARNING))
-            }
-        }
+        ListRow(title = label, subtitle = stringResource(R.string.unknown))
         return
     }
-    if (onClick != null) {
-        CompactPropertySurface(modifier = Modifier.fillMaxWidth(), onClick = { if (localEnabled) onClick(!toggled) }) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp)) {
-                Column(modifier = Modifier.weight(1F)) {
-                    Text(text = label, style = MaterialTheme.typography.titleMedium)
-                    SubtitleText(toggled = toggled, trueLabel = trueLabel, falseLabel = falseLabel, busy = busy, error = error)
-                }
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                } else {
-                    ClearSwitch(checked = toggled, enabled = localEnabled, onCheckedChange = onClick)
-                }
-            }
-        }
-    } else {
-        CompactPropertySurface(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
-                Text(text = label, style = MaterialTheme.typography.titleMedium)
-                SubtitleText(toggled = toggled, trueLabel = trueLabel, falseLabel = falseLabel, busy = busy, error = error)
-            }
+    ListRow(
+        title = label,
+        below = { SubtitleText(toggled = toggled, trueLabel = trueLabel, falseLabel = falseLabel, busy = busy, error = error) },
+    ) {
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+        } else {
+            ClearSwitch(checked = toggled, enabled = localEnabled && onClick != null, onCheckedChange = onClick)
         }
     }
 }
@@ -92,7 +75,7 @@ private fun SubtitleText(
         busy ->
             Text(
                 text = stringResource(R.string.control_applying),
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         error != null ->

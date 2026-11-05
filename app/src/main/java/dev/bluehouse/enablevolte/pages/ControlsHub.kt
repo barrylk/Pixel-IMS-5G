@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -17,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import dev.bluehouse.enablevolte.R
 import dev.bluehouse.enablevolte.components.BottomBarSpacer
+import dev.bluehouse.enablevolte.components.GlassIconButton
 import dev.bluehouse.enablevolte.components.NoteBox
 import dev.bluehouse.enablevolte.components.PageTitle
 import dev.bluehouse.enablevolte.components.SimPicker
@@ -51,14 +54,15 @@ fun ControlsHub(
         return
     }
 
-    Config(navController, selected.subscriptionId) {
-        PageTitle(title)
+    Config(navController, selected.subscriptionId) { onRefresh ->
+        PageTitle(title) {
+            GlassIconButton(Icons.Filled.Refresh, "Refresh", onRefresh)
+        }
         SimPicker(
             items = subscriptions.map { it.subscriptionId to it.uniqueName },
             selectedId = selected.subscriptionId,
             onSelect = { selectedId = it },
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
         )
-        NoteBox(stringResource(R.string.controls_safety_note), StatusTone.NEUTRAL, Modifier.padding(top = 6.dp))
     }
 }

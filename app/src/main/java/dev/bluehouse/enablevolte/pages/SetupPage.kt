@@ -47,10 +47,8 @@ fun SetupPage(subscriptions: List<SubscriptionInfo>, navController: NavControlle
                 else -> setupVm?.applyFix(check.fix)
             }
         },
-        patchContent = {
-            patchVm?.let {
-                RegionalPatchCard(it, compactWhenActive = false, liquidStyle = true, detailsAlwaysVisible = true)
-            }
+        patchContent = patchVm?.let { vm ->
+            { RegionalPatchCard(vm, compactWhenActive = false, liquidStyle = true, detailsAlwaysVisible = true) }
         },
     )
 }

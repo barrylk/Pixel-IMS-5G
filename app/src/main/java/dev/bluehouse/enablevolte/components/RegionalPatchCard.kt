@@ -126,6 +126,94 @@ fun RegionalPatchCard(
         return
     }
 
+    // Home's Clear Glass card: one row with the state pill, a short explanation, the
+    // prerequisites, then small pill actions. Details stay one tap away.
+    if (liquidStyle) {
+        ContentCard(modifier) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Modem carrier database", fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                if (phase == PatchPhase.CHECKING || ui.busy) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(
+                        headline,
+                        color = tone,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        modifier = Modifier.clip(CircleShape).background(tone.copy(alpha = 0.14f)).padding(horizontal = 9.dp, vertical = 4.dp),
+                    )
+                }
+            }
+            Text(
+                when (phase) {
+                    PatchPhase.REBOOT -> stringResource(R.string.patch_card_reboot_body)
+                    PatchPhase.REMOVING -> stringResource(R.string.patch_card_removing_body)
+                    PatchPhase.ACTIVE -> stringResource(R.string.patch_card_active_body)
+                    PatchPhase.INACTIVE, PatchPhase.UNAVAILABLE -> status?.message.orEmpty()
+                    else -> stringResource(R.string.patch_card_pitch)
+                },
+                fontSize = 12.5.sp,
+                lineHeight = 18.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (status != null && phase != PatchPhase.CHECKING) {
+                val rootName = status.rootManager.ifBlank { stringResource(R.string.patch_check_magisk) }
+                Text(
+                    "${if (status.supported) "✓" else "×"} Tensor  ·  ${if (status.magiskAvailable) "✓" else "×"} $rootName  ·  ${if (status.sourceAvailable) "✓" else "×"} Modem database",
+                    fontSize = 10.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            ui.outcome?.let { outcome ->
+                NoteBox(outcome, StatusTone.ACCENT)
+                TonalPillButton(stringResource(R.string.dismiss), viewModel::dismissOutcome, small = true)
+            }
+            if (status != null) {
+                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    when {
+                        ReadinessRules.canInstallPatch(status) ->
+                            PrimaryPillButton(
+                                stringResource(if (ui.busy) R.string.applying_profile else R.string.install_patch),
+                                { viewModel.requestConfirmation(RegionalPatchAction.INSTALL) },
+                                enabled = !ui.busy,
+                            )
+                        ReadinessRules.canRevalidatePatch(status) ->
+                            TonalPillButton(
+                                stringResource(R.string.reinstall_patch),
+                                { viewModel.requestConfirmation(RegionalPatchAction.INSTALL) },
+                                enabled = !ui.busy,
+                                small = true,
+                            )
+                    }
+                    if (ReadinessRules.canRemovePatch(status)) {
+                        TonalPillButton(
+                            stringResource(R.string.remove_patch),
+                            { viewModel.requestConfirmation(RegionalPatchAction.REMOVE) },
+                            enabled = !ui.busy,
+                            danger = true,
+                            small = true,
+                        )
+                    }
+                }
+            }
+            QuietButton(stringResource(if (expanded) R.string.patch_card_hide_details else R.string.patch_card_details), { expanded = !expanded })
+            if (expanded) {
+                Text(stringResource(R.string.regional_patch_description), fontSize = 12.sp, lineHeight = 17.sp)
+                status?.let { patch ->
+                    if (patch.device.isNotBlank()) DetailLine(stringResource(R.string.patch_device), patch.device)
+                    if (patch.message.isNotBlank()) {
+                        Text(patch.message, fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (patch.sourceSha256.isNotBlank()) DetailLine(stringResource(R.string.stock_database_hash), patch.sourceSha256.take(16) + "…")
+                    if (patch.patchedSha256.isNotBlank()) DetailLine(stringResource(R.string.patched_database_hash), patch.patchedSha256.take(16) + "…")
+                }
+                NoteBox(stringResource(R.string.regional_patch_warning), StatusTone.WARNING)
+            }
+        }
+        return
+    }
+
     val prominent = phase == PatchPhase.READY || phase == PatchPhase.REBOOT
     PatchCardSurface(
         modifier.fillMaxWidth(),

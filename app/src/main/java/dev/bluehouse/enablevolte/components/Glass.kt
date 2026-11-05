@@ -7,6 +7,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.unit.dp
 import dev.bluehouse.enablevolte.ui.theme.InstrumentColors
 import dev.bluehouse.enablevolte.ui.theme.LocalInstrument
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -52,12 +54,20 @@ val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 @Composable
 fun Modifier.floatingGlass(
     shape: Shape = MaterialTheme.shapes.large,
-    tint: Color = Color.Unspecified,
+    @Suppress("UNUSED_PARAMETER") tint: Color = Color.Unspecified,
+    shadow: Boolean = true,
 ): Modifier {
     val inst = LocalInstrument.current
     val haze = LocalHazeState.current
     val ground = MaterialTheme.colorScheme.background
+    // The concept's glass: a translucent fill over a real blur, a bright 1 dp edge, a
+    // highlight along the top, a soft specular sheen and a soft drop shadow.
+    val fill = if (inst.isDark) Color(0x8C1C212A) else Color(0x94FFFFFF)
+    val edge = if (inst.isDark) Color(0x24FFFFFF) else Color(0xD9FFFFFF)
+    val highlight = if (inst.isDark) Color(0x2EFFFFFF) else Color(0xE6FFFFFF)
+    val shadowColor = if (inst.isDark) Color(0x80000000) else Color(0x3D1E2D50)
     return this
+        .then(if (shadow) Modifier.shadow(12.dp, shape, ambientColor = shadowColor, spotColor = shadowColor) else Modifier)
         .clip(shape)
         .then(
             if (haze != null) {
@@ -65,16 +75,42 @@ fun Modifier.floatingGlass(
                     state = haze,
                     style = HazeStyle(
                         backgroundColor = ground,
-                        tints = listOf(HazeTint(inst.scrim.copy(alpha = if (inst.isDark) 0.45f else 0.55f))),
-                        blurRadius = 26.dp,
-                        noiseFactor = 0.06f,
+                        tints = listOf(HazeTint(fill)),
+                        blurRadius = 22.dp,
+                        noiseFactor = 0f,
                     ),
-                )
+                ) {
+                    // Blur a half-size copy: the same look at a fraction of the GPU cost.
+                    inputScale = HazeInputScale.Fixed(0.5f)
+                }
             } else {
-                Modifier
+                Modifier.background(fill)
             },
         )
-        .liquidGlass(shape, if (haze != null) GlassDepth.FLOATING else GlassDepth.THICK, tint)
+        .drawWithCache {
+            val outline = shape.createOutline(size, layoutDirection, this)
+            val sheen = Brush.linearGradient(
+                0f to Color.White.copy(alpha = if (inst.isDark) 0.10f else 0.32f),
+                0.38f to Color.Transparent,
+                0.70f to Color.Transparent,
+                1f to Color.White.copy(alpha = if (inst.isDark) 0.03f else 0.10f),
+                start = Offset.Zero,
+                end = Offset(size.width * 0.35f, size.height),
+            )
+            val edgeWidth = 1.dp.toPx() * 2f
+            val top = 1.dp.toPx()
+            onDrawWithContent {
+                drawOutline(outline, sheen)
+                drawContent()
+                drawOutline(outline, edge, style = Stroke(edgeWidth))
+                drawLine(
+                    Brush.horizontalGradient(0.1f to Color.Transparent, 0.5f to highlight, 0.9f to Color.Transparent),
+                    start = Offset(0f, top * 1.5f),
+                    end = Offset(size.width, top * 1.5f),
+                    strokeWidth = top,
+                )
+            }
+        }
 }
 
 /** A calm, solid content card: no rim, no bloom. Glass is kept for what floats. */

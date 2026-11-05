@@ -34,6 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import dev.bluehouse.enablevolte.components.ClearSwitch
@@ -47,6 +50,8 @@ import dev.bluehouse.enablevolte.components.PrimaryPillButton
 import dev.bluehouse.enablevolte.components.StatusTone
 import dev.bluehouse.enablevolte.components.TonalPillButton
 import dev.bluehouse.enablevolte.components.BottomBarSpacer
+import dev.bluehouse.enablevolte.components.PageEnd
+import dev.bluehouse.enablevolte.components.Segments
 import dev.bluehouse.enablevolte.BooleanControl
 import dev.bluehouse.enablevolte.ConfigControls
 import dev.bluehouse.enablevolte.ConfigUiState
@@ -94,7 +99,7 @@ private fun SectionPanel(
 fun Config(
     navController: NavController,
     subId: Int,
-    header: (@Composable ColumnScope.() -> Unit)? = null,
+    header: (@Composable ColumnScope.(onRefresh: () -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val viewModel: ConfigViewModel =
@@ -166,13 +171,30 @@ fun Config(
 
     val networkRows = listOfNotNull<@Composable () -> Unit>(
         {
-            RadioSelectPropertyView(
-                label = nrLabel,
-                values = nrLabels,
-                selectedIndex = ui.nrAvailability.value ?: 0,
-                busy = ui.nrAvailability.isBusy,
-                error = if (ui.nrAvailability.hasFailed) ui.nrAvailability.message else null,
-            ) { viewModel.setNrAvailability(it) }
+            // The concept's inline segments: Off / NSA / SA / NSA + SA.
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(nrLabel, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    if (ui.nrAvailability.isBusy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                }
+                Segments(
+                    options = listOf("Off", "NSA", "SA", "NSA + SA"),
+                    selectedIndex = ui.nrAvailability.value ?: 0,
+                    onSelect = { viewModel.setNrAvailability(it) },
+                    enabled = !ui.nrAvailability.isBusy,
+                )
+                Text(
+                    nrLabels.getOrNull(ui.nrAvailability.value ?: 0).orEmpty(),
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (ui.nrAvailability.hasFailed) {
+                    Text(ui.nrAvailability.message.orEmpty(), fontSize = 11.5.sp, color = MaterialTheme.colorScheme.error)
+                }
+            }
         },
         {
             RadioSelectPropertyView(
@@ -183,7 +205,7 @@ fun Config(
                 error = if (ui.radioMode.hasFailed) ui.radioMode.message else null,
             ) { viewModel.setRadioMode(it) }
         },
-        { ClickablePropertyView(label = radioWarning, value = "") },
+        { NoteBox(radioWarning, StatusTone.WARNING, Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) },
         { ClickablePropertyView(label = bandsLabel, value = "") { navController.navigate("bands/$subId") } },
         toggleRow(stringResource(R.string.enable_enhanced_4g_lte_plus), ConfigControls.FOUR_G_PLUS),
         toggleRow(stringResource(R.string.allow_adding_apns), ConfigControls.ALLOW_ADDING_APNS),
@@ -231,7 +253,7 @@ fun Config(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (header != null) {
-            header()
+            header { viewModel.load() }
         } else {
             PageTitle(stringResource(R.string.sim_config))
         }
@@ -242,9 +264,8 @@ fun Config(
                 } else {
                     R.string.shizuku_sim_config_persistence
                 },
-            ),
+            ) + "\n" + stringResource(R.string.controls_safety_note),
             tone = StatusTone.WARNING,
-            modifier = Modifier.padding(top = 6.dp),
         )
 
         if (PrivilegeManager.activeMode == PrivilegeMode.SHIZUKU) {
@@ -326,15 +347,14 @@ fun Config(
         SectionPanel(
             title = stringResource(R.string.miscellaneous),
             rows = listOf(
-                { ClickablePropertyView(label = resetLabel, value = resetValue) { viewModel.resetAll() } },
+                { ListRow(resetLabel, subtitle = resetValue, titleColor = MaterialTheme.colorScheme.error, onClick = { viewModel.resetAll() }) },
                 { ClickablePropertyView(label = expertLabel, value = "") { navController.navigate("config/$subId/edit") } },
                 { ClickablePropertyView(label = dumpLabel, value = "") { navController.navigate("config/$subId/dump") } },
                 { ClickablePropertyView(label = restartLabel, value = "") { viewModel.restartIms() } },
             ),
         )
 
-        Spacer(Modifier.height(20.dp))
-        BottomBarSpacer()
+        PageEnd()
     }
 }
 

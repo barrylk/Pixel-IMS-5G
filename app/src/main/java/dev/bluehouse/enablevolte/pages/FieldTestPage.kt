@@ -43,6 +43,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import dev.bluehouse.enablevolte.components.BottomBarSpacer
+import dev.bluehouse.enablevolte.components.Chevron
+import dev.bluehouse.enablevolte.components.PageEnd
+import dev.bluehouse.enablevolte.ui.theme.Mono
 import dev.bluehouse.enablevolte.components.ClearSwitch
 import dev.bluehouse.enablevolte.components.ContentCard
 import dev.bluehouse.enablevolte.components.GroupCard
@@ -256,20 +259,15 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
         )
 
         HeroCard(
-            title = stringResource(R.string.standard_field_test),
-            eyebrow = stringResource(R.string.premium_field_eyebrow),
-            body = stringResource(R.string.premium_field_description),
+            title = "Test this SIM",
+            eyebrow = "Timed diagnostic report",
+            body = stringResource(R.string.premium_field_description) + " " + stringResource(R.string.field_test_privacy),
         ) {
-            Text(
-                stringResource(R.string.field_test_privacy),
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (runningMode == "standard") {
+            if (runningMode != null) {
                 LinearProgressIndicator(
                     progress = { progress.toFloat() / FieldTestReporter.SAMPLE_COUNT },
-                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    color = if (runningMode == "aggressive") statusToneColor(StatusTone.WARNING) else MaterialTheme.colorScheme.primary,
                 )
             }
             Row(
@@ -277,82 +275,55 @@ fun FieldTestPage(subscriptions: List<SubscriptionInfo>) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PrimaryPillButton(
-                    text = if (runningMode == "standard") {
-                        stringResource(R.string.field_test_progress, progress, FieldTestReporter.SAMPLE_COUNT)
-                    } else {
-                        stringResource(R.string.start_field_test)
-                    },
-                    onClick = { start(aggressive = false) },
-                    enabled = selectedSubscription != null && runningMode == null,
-                    modifier = Modifier.weight(1f),
-                )
-                StatusPill(stringResource(R.string.premium_safe), StatusTone.SUCCESS)
-            }
-        }
-
-        GroupLabel(stringResource(R.string.aggressive_5g_test))
-        ContentCard {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.aggressive_5g_test),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-                StatusPill(stringResource(R.string.premium_expert), StatusTone.WARNING)
+                if (runningMode == "aggressive") {
+                    TonalPillButton(
+                        stringResource(R.string.stop_and_restore) + " · " + stringResource(R.string.field_test_progress, progress, FieldTestReporter.SAMPLE_COUNT),
+                        { activeJob?.cancel() },
+                        Modifier.weight(1f),
+                        danger = true,
+                    )
+                } else {
+                    PrimaryPillButton(
+                        text = if (runningMode == "standard") {
+                            stringResource(R.string.field_test_progress, progress, FieldTestReporter.SAMPLE_COUNT)
+                        } else {
+                            "Start test"
+                        },
+                        onClick = { start(aggressive = false) },
+                        enabled = selectedSubscription != null && runningMode == null,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TonalPillButton(
+                        "Aggressive",
+                        { confirmAggressive = true },
+                        enabled = selectedSubscription != null && runningMode == null,
+                    )
+                }
             }
             Text(
-                stringResource(R.string.aggressive_5g_description),
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
+                "Aggressive opens every supported LTE/NR gate for two minutes with small data checks, then restores your settings. You are asked first.",
+                fontSize = 10.5.sp,
+                lineHeight = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
             )
-            if (runningMode == "aggressive") {
-                LinearProgressIndicator(
-                    progress = { progress.toFloat() / FieldTestReporter.SAMPLE_COUNT },
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    color = statusToneColor(StatusTone.WARNING),
-                )
-                Text(stringResource(R.string.field_test_progress, progress, FieldTestReporter.SAMPLE_COUNT), fontSize = 12.sp)
-                TonalPillButton(
-                    stringResource(R.string.stop_and_restore),
-                    { activeJob?.cancel() },
-                    Modifier.fillMaxWidth().padding(top = 4.dp),
-                    danger = true,
-                )
-            } else {
-                TonalPillButton(
-                    stringResource(R.string.start_aggressive_test),
-                    { confirmAggressive = true },
-                    Modifier.fillMaxWidth().padding(top = 4.dp),
-                    enabled = selectedSubscription != null && runningMode == null,
-                )
-            }
-            NoteBox(stringResource(R.string.aggressive_warning), StatusTone.DANGER, Modifier.padding(top = 4.dp))
         }
 
         status?.let { NoteBox(it, StatusTone.ACCENT) }
         error?.let { NoteBox(it, StatusTone.DANGER) }
         result?.let { report ->
-            GroupLabel(stringResource(R.string.field_test_complete))
-            ContentCard {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.field_test_saved, report.fileName),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
-                    )
+            GroupLabel("Last report")
+            GroupCard {
+                ListRow(report.fileName, subtitle = report.summary) {
                     StatusPill(stringResource(R.string.field_test_complete), StatusTone.SUCCESS)
                 }
-                Text(report.summary, fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TonalPillButton(stringResource(R.string.share_field_test), { share(report) }, small = true)
+                GroupDivider()
+                ListRow(stringResource(R.string.share_field_test), onClick = { share(report) }) { Chevron() }
             }
         }
 
         RadioLogCapturePanel()
-        BottomBarSpacer()
+        PageEnd()
     }
 }
 
@@ -427,14 +398,7 @@ private fun RadioLogCapturePanel() {
         )
     }
 
-    GroupLabel(stringResource(R.string.radio_logs_title) + " · " + stringResource(R.string.radio_logs_root_chip))
-    Text(
-        stringResource(R.string.radio_logs_description),
-        fontSize = 12.sp,
-        lineHeight = 17.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 6.dp),
-    )
+    GroupLabel(stringResource(R.string.radio_logs_title) + " · " + stringResource(R.string.radio_logs_root_chip).lowercase())
     GroupCard {
         ListRow(
             title = stringResource(R.string.radio_logs_redact),
@@ -522,6 +486,13 @@ private fun RadioLogCapturePanel() {
         enabled = rootReady && !busy,
         modifier = Modifier.fillMaxWidth(),
     )
+    Text(
+        stringResource(R.string.radio_logs_description),
+        fontSize = 10.5.sp,
+        lineHeight = 14.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 6.dp),
+    )
     if (!rootReady) NoteBox(stringResource(R.string.radio_logs_root_only), StatusTone.NEUTRAL)
     captureError?.let { NoteBox(it, StatusTone.DANGER) }
     capture?.let { result ->
@@ -550,13 +521,13 @@ private fun RadioLogCapturePanel() {
                 Text(stringResource(R.string.radio_logs_endc_none), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 result.endcEvents.takeLast(8).forEach {
-                    Text(it, fontSize = 10.5.sp, lineHeight = 15.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(it, fontSize = 10.5.sp, lineHeight = 15.sp, fontFamily = Mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (result.uecap.isNotEmpty()) {
                 Text(stringResource(R.string.radio_logs_uecap), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
                 result.uecap.takeLast(4).forEach {
-                    Text(it, fontSize = 10.5.sp, lineHeight = 15.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(it, fontSize = 10.5.sp, lineHeight = 15.sp, fontFamily = Mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (result.modemFiles > 0) {
