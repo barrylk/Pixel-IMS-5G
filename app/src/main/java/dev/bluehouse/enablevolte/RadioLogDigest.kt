@@ -171,7 +171,7 @@ object RadioLogDigest {
     ) {
         fun describe(): String =
             if (combos == 0) {
-                "no band combinations"
+                "feature/bandwidth table only, no band combinations"
             } else {
                 "$combos combinations, $endc EN-DC; LTE ${lteBands.joinToString(",") { "B$it" }}; " +
                     "NR ${nrBands.joinToString(",") { "n$it" }}; e.g. ${samples.joinToString("  ")}"

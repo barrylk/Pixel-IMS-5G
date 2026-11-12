@@ -62,7 +62,7 @@ class RadioLogDigestTest {
     fun uecapLogWithOnlyFeatureTablesHasNoCombinations() {
         val bytes = message { varint(1, 889611834); bytes(6, message { varint(1, 1) }) }
         assertEquals(0, RadioLogDigest.decodeUecapLog(bytes)!!.combos)
-        assertEquals("no band combinations", RadioLogDigest.decodeUecapLog(bytes)!!.describe())
+        assertEquals("feature/bandwidth table only, no band combinations", RadioLogDigest.decodeUecapLog(bytes)!!.describe())
     }
 
     @Test

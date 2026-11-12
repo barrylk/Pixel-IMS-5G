@@ -15,7 +15,10 @@ internal fun regionalSingleFileBootScript(
         [ -f "${'$'}MODDIR/disable" ] && exit 0
         [ -f "${'$'}MODDIR/remove" ] && exit 0
         rm -f "${'$'}MODDIR/.pending_reboot"
-        [ "${'$'}KSU_LATE_LOAD" = 1 ] && fail 'late-load unsupported; reboot with normal KernelSU boot integration'
+        # KernelSU late-load (temporary root) runs this after boot, when the modem has
+        # already read the stock database. The bind is the same; only the outcome differs.
+        ACTIVE=active
+        [ "${'$'}KSU_LATE_LOAD" = 1 ] && ACTIVE=active-late-load
         [ -f "${'$'}SOURCE" ] && [ ! -L "${'$'}SOURCE" ] || fail 'staged database missing or symlinked'
         [ -f "${'$'}TARGET" ] && [ ! -L "${'$'}TARGET" ] || fail 'live database missing or symlinked'
         SELF_NS="${'$'}(readlink /proc/self/ns/mnt)"
@@ -33,7 +36,7 @@ internal fun regionalSingleFileBootScript(
         [ "${'$'}(hash_file "${'$'}SOURCE")" = "${'$'}PATCHED" ] || fail 'staged database checksum mismatch'
         LIVE="${'$'}(hash_file "${'$'}TARGET")"
         if [ "${'$'}LIVE" = "${'$'}PATCHED" ]; then
-            printf '%s\n' active > "${'$'}STATUS"
+            printf '%s\n' "${'$'}ACTIVE" > "${'$'}STATUS"
             exit 0
         fi
         [ "${'$'}LIVE" = "${'$'}STOCK" ] || fail 'firmware database changed; validate a fresh patch'
@@ -56,6 +59,6 @@ internal fun regionalSingleFileBootScript(
         if [ "${'$'}(hash_file "${'$'}TARGET")" != "${'$'}PATCHED" ]; then
             rollback 'live database verification failed'
         fi
-        printf '%s\n' active > "${'$'}STATUS"
+        printf '%s\n' "${'$'}ACTIVE" > "${'$'}STATUS"
     """.trimIndent() + "\n"
 }
