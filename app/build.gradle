@@ -13,8 +13,8 @@ android {
         // Every Tensor Pixel (Pixel 6 and newer) launched on Android 12 / API 31 or later.
         minSdk 31
         targetSdk 36
-        versionCode 41
-        versionName "2.2.9"
+        versionCode 42
+        versionName "2.2.10"
 
         vectorDrawables {
             useSupportLibrary true
