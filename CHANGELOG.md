@@ -1,5 +1,12 @@
 # Changelog
 
+### 2.2.10 - KernelSU late-load support
+
+- The regional modem patch now works with KernelSU late-load (temporary root) instead of refusing it ([#23](https://github.com/barrylk/Pixel-IMS-5G/issues/23)). The same verified single-file bind runs, and the app explains that the modem read the stock database at boot and that temporary root must be reapplied after each reboot.
+- The radio log summary no longer calls a capability log without band combinations an empty capability; it is a feature/bandwidth table.
+- The Pixel 10 Pro XL 5G issue remains open.
+- See the [release notes](.github/release-notes/v2.2.10.md).
+
 ### 2.2.9 - clearer radio log summary
 
 - Fixes the radio log summary's EN-DC list, which in 2.2.8 matched ordinary registration lines that merely print `isEnDcAvailable`.
