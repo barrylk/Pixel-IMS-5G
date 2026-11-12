@@ -569,7 +569,7 @@ class PrivilegedService : RootService() {
             var rilFileCount = 0
             val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
             // /proc/uptime gives seconds since boot; the modem's capability logs are judged
-            // against this, because an empty capability written at boot is a key lead.
+            // against this, to tell logs written since boot from older ones.
             val uptimeMs = runCatching {
                 (File("/proc/uptime").readText().trim().substringBefore(' ').toDouble() * 1000).toLong()
             }.getOrDefault(0L)
@@ -663,7 +663,7 @@ class PrivilegedService : RootService() {
                     appendLine("5G / EN-DC timeline (changes only, newest last):")
                     if (events.isEmpty()) appendLine("  none found") else events.forEach { appendLine("  $it") }
                     appendLine()
-                    appendLine("Modem UE-capability logs (oldest first; an empty one at last boot is a key lead):")
+                    appendLine("Modem UE-capability logs (oldest first; a table-only log is not an empty capability):")
                     if (uecap.length() == 0) appendLine("  none found")
                     for (i in 0 until uecap.length()) appendLine("  ${uecap.getString(i)}")
                     if (skipped.length() > 0) {
@@ -983,6 +983,11 @@ class PrivilegedService : RootService() {
                 !File(REGIONAL_SOURCE_DB).isFile -> "The Tensor carrier database was not found on this firmware."
                 File(module, "remove").isFile -> "Removal is scheduled. Reboot to restore the stock modem database."
                 File(module, ".pending_reboot").isFile -> "Patch installed. Reboot is required before it becomes active."
+                database.isFile && active && bootStatus == "active-late-load" ->
+                    "The patched regional carrier database was mounted after boot by KernelSU late-load " +
+                        "(temporary root). The modem read the stock database at boot, so toggle airplane mode " +
+                        "or reinsert the SIM before judging the result. Temporary root must be applied again " +
+                        "after every reboot."
                 database.isFile && active ->
                     "The patched regional carrier database is mounted."
                 database.isFile && method == "single-file-bind" ->

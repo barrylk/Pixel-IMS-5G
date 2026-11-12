@@ -26,6 +26,7 @@ class RegionalBindMountTest {
         verifyFails: Boolean = false,
         namespaceFails: Boolean = false,
         remountFails: Boolean = false,
+        lateLoad: Boolean = false,
     ): Pair<File, String> {
         val module = temp.newFolder("module")
         val files = File(module, "files").apply { mkdir() }
@@ -76,6 +77,7 @@ class RegionalBindMountTest {
                 environment()["MOUNT_LOG"] = posix(log)
                 environment()["STOCK_BACKUP"] = posix(backup)
                 environment()["MSYS_NO_PATHCONV"] = "1"
+                if (lateLoad) environment()["KSU_LATE_LOAD"] = "1" else environment().remove("KSU_LATE_LOAD")
             }.start()
         assertTrue("Boot script must not stall", process.waitFor(10, TimeUnit.SECONDS))
         val output = process.inputStream.bufferedReader().readText()
@@ -89,6 +91,20 @@ class RegionalBindMountTest {
         assertTrue(commands.contains("--bind "))
         assertTrue(commands.contains("remount,bind,ro"))
         assertFalse(commands.contains("overlay"))
+    }
+
+    @Test fun lateLoadMountsAndRecordsLateActivation() {
+        val (module, commands) = runBoot(lateLoad = true)
+        assertEquals("active-late-load", File(module, "bind.status").readText().trim())
+        assertTrue(commands.contains("--bind "))
+        assertTrue(commands.contains("remount,bind,ro"))
+        assertEquals("patched", File(temp.root, "live-cfg.db").readText())
+    }
+
+    @Test fun lateLoadStillRefusesChangedFirmware() {
+        val (module, commands) = runBoot(lateLoad = true, changedFirmware = true)
+        assertEquals("", commands)
+        assertTrue(File(module, "bind.status").readText().contains("firmware database changed"))
     }
 
     @Test fun disabledModuleNeverMounts() { assertEquals("", runBoot(disabled = true).second) }
