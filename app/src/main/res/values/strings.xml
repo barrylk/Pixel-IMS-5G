@@ -462,7 +462,7 @@
     <string name="patch_check_device">Tensor</string>
     <string name="patch_check_firmware">Modem DB</string>
     <string name="shizuku_reapply_on_boot">Reapply after reboot</string>
-    <string name="shizuku_reapply_on_boot_summary">Saves SIM Config changes made from now on and reapplies them once Shizuku is running after a reboot. Shizuku has to start on boot (for example a fork that does).</string>
+    <string name="shizuku_reapply_on_boot_summary">Android 14 and later drop Shizuku changes on every reboot. This saves your SIM Config changes and reapplies them once per boot as soon as Shizuku is running: automatically if Shizuku starts on boot, otherwise when you start Shizuku and open this app.</string>
     <string name="radio_logs_title">Radio log capture</string>
     <string name="radio_logs_root_chip">Root</string>
     <string name="radio_logs_description">Saves the vendor RIL logs (sit-ril), the modem\'s capability logs, the radio log buffer and telephony state to a ZIP in Downloads. Read-only: nothing is enabled or changed. Capture right after reproducing a problem, for example while 5G shows as advertised but not connected.</string>

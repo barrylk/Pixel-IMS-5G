@@ -144,6 +144,9 @@ class HomeActivity : ComponentActivity() {
 
         HiddenApiBypass.addHiddenApiExemptions("L")
         HiddenApiBypass.addHiddenApiExemptions("I")
+        // Shizuku overrides do not survive a reboot (#26): reapply once per boot as soon as
+        // Shizuku is reachable, however late it was started.
+        ShizukuBootReapply.watch(this)
         enableEdgeToEdge()
 
         setContent {

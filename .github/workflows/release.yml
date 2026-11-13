@@ -61,11 +61,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes_file=".github/release-notes/${GITHUB_REF_NAME}.md"
+          # A tag with a suffix (v2.2.11-test1) is a test build: publish it as a
+          # pre-release so the in-app updater, which reads releases/latest, skips it.
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             if [ -f "$notes_file" ]; then
-              gh release create "$GITHUB_REF_NAME" --notes-file "$notes_file" --title "Pixel IMS 5G $GITHUB_REF_NAME"
+              gh release create "$GITHUB_REF_NAME" $prerelease --notes-file "$notes_file" --title "Pixel IMS 5G $GITHUB_REF_NAME"
             else
-              gh release create "$GITHUB_REF_NAME" --generate-notes --title "Pixel IMS 5G $GITHUB_REF_NAME"
+              gh release create "$GITHUB_REF_NAME" $prerelease --generate-notes --title "Pixel IMS 5G $GITHUB_REF_NAME"
             fi
           fi
           gh release upload "$GITHUB_REF_NAME" "Pixel-IMS-5G-${GITHUB_REF_NAME}.apk" --clobber
